@@ -1,0 +1,29 @@
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+C = AU
+ST = NSW
+L = Sydney
+O = CyberLab
+CN = traefik.cyberlab.local
+
+[v3_req]
+keyUsage = keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = traefik.cyberlab.local
+DNS.2 = wazuh.cyberlab.local
+DNS.3 = dashboard.cyberlab.local
+DNS.4 = wazuh-api.cyberlab.local
+DNS.5 = neuvector.cyberlab.local
+DNS.6 = security.cyberlab.local
+DNS.7 = web.cyberlab.local
+DNS.8 = phpldapadmin.cyberlab.local
+DNS.9 = workstation.cyberlab.local
+DNS.10 = chat.cyberlab.local
+DNS.11 = ldap.cyberlab.local

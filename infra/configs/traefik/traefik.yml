@@ -1,0 +1,125 @@
+###############################################################################
+# Traefik Reverse Proxy Configuration with Let's Encrypt/ACME
+#
+# This configuration provides:
+#  - Automatic TLS certificate management via Let's Encrypt
+#  - ACME challenge support (HTTP-01 and DNS-01)
+#  - Certificate renewal (90 days)
+#  - Load balancing and reverse proxying
+#  - NeuVector security integration
+#  - Dashboard with security controls
+###############################################################################
+
+# Global settings
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+# Enable API and Dashboard
+api:
+  dashboard: true
+  debug: false
+
+# Entrypoints - define ports and protocols
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: "websecure"
+          scheme: "https"
+
+  websecure:
+    address: ":443"
+    http:
+      tls: {}
+
+  # Metrics endpoint
+  metrics:
+    address: ":8082"
+
+  # Wazuh API HTTPS entry point (custom port)
+  wazuh-api:
+    address: ":55000"
+
+  # Wazuh agents - TCP entrypoint for syslog agents (1514)
+  wazuh-agents:
+    address: ":1514"
+
+# Providers configuration
+providers:
+  # Docker provider for container discovery
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: "infra_dmz_net"
+    watch: true
+
+  # File provider for dynamic configuration
+  file:
+    filename: "/etc/traefik/dynamic.yml"
+    watch: true
+
+# Certificate providers
+## Disabled public Let's Encrypt/ACME in local lab environment; use default file-based certificate
+# certificatesResolvers:
+#   letsencrypt:
+#     acme:
+#       email: "admin@example.com"
+#       storage: "/etc/traefik/acme/acme.json"
+#       httpChallenge:
+#         entryPoint: "web"
+
+  # Self-signed certificates fallback
+  # Remove selfsigned ACME resolver: self-signed certificates are provided via file-based default certificates
+# TLS configuration - stores and default certificate
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: "/certs/traefik-cert.pem"
+        keyFile: "/certs/traefik-key.pem"
+
+# Security options
+
+
+# Logging configuration
+log:
+  level: "INFO"
+  filePath: "/var/log/traefik/traefik.log"
+  format: "json"
+
+accessLog:
+  filePath: "/var/log/traefik/access.log"
+  format: "json"
+  fields:
+    defaultMode: "keep"
+    names:
+      Authorization: redact
+      Cookie: redact
+      X-Auth-Token: redact
+      X-API-Key: redact
+      X-Auth: redact
+    headers:
+      defaultMode: drop
+      names:
+        Authorization: redact
+        Cookie: redact
+        X-Auth-Token: redact
+        X-API-Key: redact
+        User-Agent: keep
+        Accept: keep
+        Content-Type: keep
+  bufferingSize: 100
+
+# Metrics and monitoring
+metrics:
+  prometheus:
+    entryPoint: "metrics"
+    addEntryPointsLabels: true
+    addServicesLabels: true
+
+# NeuVector integration via labels
+# Services can be protected by adding these labels:
+# - traefik.http.middlewares.neuvector.whiteList.sourceRange=10.10.10.0/24

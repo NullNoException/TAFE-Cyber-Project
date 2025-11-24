@@ -1,0 +1,153 @@
+###############################################################################
+# CyberLab LDAP Directory Schema
+# Base DN: dc=cyberlab,dc=local
+###############################################################################
+
+# Root DSE
+dn: dc=cyberlab,dc=local
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: CyberLab
+dc: cyberlab
+description: CyberLab Security Infrastructure Directory
+creatorsName: cn=admin,dc=cyberlab,dc=local
+createTimestamp: 20251124000000Z
+
+# Admin User
+dn: cn=admin,dc=cyberlab,dc=local
+objectClass: simpleSecurityObject
+objectClass: organizationalRole
+cn: admin
+description: LDAP Directory Administrator
+userPassword: {SSHA}hashed_password_here
+
+# Organizational Units
+dn: ou=users,dc=cyberlab,dc=local
+objectClass: organizationalUnit
+ou: users
+description: User accounts - system and service users
+
+dn: ou=groups,dc=cyberlab,dc=local
+objectClass: organizationalUnit
+ou: groups
+description: Group definitions for role-based access control
+
+dn: ou=roles,dc=cyberlab,dc=local
+objectClass: organizationalUnit
+ou: roles
+description: Role-based access control groups
+
+dn: ou=services,dc=cyberlab,dc=local
+objectClass: organizationalUnit
+ou: services
+description: Service accounts for applications and daemons
+
+dn: ou=devices,dc=cyberlab,dc=local
+objectClass: organizationalUnit
+ou: devices
+description: Device accounts and assets
+
+# Security Teams and Groups
+dn: cn=security-team,ou=groups,dc=cyberlab,dc=local
+objectClass: groupOfNames
+cn: security-team
+member: cn=admin,dc=cyberlab,dc=local
+description: Security operations team members
+
+dn: cn=siem-admins,ou=groups,dc=cyberlab,dc=local
+objectClass: groupOfNames
+cn: siem-admins
+description: Wazuh SIEM administrators
+member: cn=admin,dc=cyberlab,dc=local
+
+dn: cn=network-admins,ou=groups,dc=cyberlab,dc=local
+objectClass: groupOfNames
+cn: network-admins
+description: Network and firewall administrators
+member: cn=admin,dc=cyberlab,dc=local
+
+dn: cn=vpn-users,ou=groups,dc=cyberlab,dc=local
+objectClass: groupOfNames
+cn: vpn-users
+description: VPN access group for remote connectivity
+member: cn=admin,dc=cyberlab,dc=local
+
+# Role-Based Access Groups
+dn: cn=role-admin,ou=roles,dc=cyberlab,dc=local
+objectClass: groupOfNames
+cn: role-admin
+description: Administrator role - full system access
+member: cn=admin,dc=cyberlab,dc=local
+
+dn: cn=role-security,ou=roles,dc=cyberlab,dc=local
+objectClass: groupOfNames
+cn: role-security
+description: Security analyst role - monitoring and alerts access
+member: cn=admin,dc=cyberlab,dc=local
+
+dn: cn=role-operator,ou=roles,dc=cyberlab,dc=local
+objectClass: groupOfNames
+cn: role-operator
+description: Operations role - service management
+member: cn=admin,dc=cyberlab,dc=local
+
+dn: cn=role-readonly,ou=roles,dc=cyberlab,dc=local
+objectClass: groupOfNames
+cn: role-readonly
+description: Read-only role - reporting and monitoring access
+
+# Service Accounts
+dn: uid=wazuh-indexer,ou=services,dc=cyberlab,dc=local
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+uid: wazuh-indexer
+cn: Wazuh Indexer Service
+sn: Indexer
+givenName: Wazuh
+mail: wazuh-indexer@cyberlab.local
+description: Service account for Wazuh OpenSearch indexer
+userPassword: {SSHA}service_password_hash
+
+dn: uid=wazuh-manager,ou=services,dc=cyberlab,dc=local
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+uid: wazuh-manager
+cn: Wazuh Manager Service
+sn: Manager
+givenName: Wazuh
+mail: wazuh-manager@cyberlab.local
+description: Service account for Wazuh SIEM manager
+userPassword: {SSHA}service_password_hash
+
+dn: uid=traefik,ou=services,dc=cyberlab,dc=local
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+uid: traefik
+cn: Traefik Reverse Proxy
+sn: Proxy
+givenName: Traefik
+mail: traefik@cyberlab.local
+description: Service account for Traefik load balancer
+userPassword: {SSHA}service_password_hash
+
+# Sample User Account Template
+dn: uid=sampleuser,ou=users,dc=cyberlab,dc=local
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+uid: sampleuser
+cn: Sample User
+sn: User
+givenName: Sample
+mail: sampleuser@cyberlab.local
+telephoneNumber: +1-555-0100
+mobile: +1-555-0101
+departmentNumber: Security
+description: Example user account - delete or use as template
+userPassword: {SSHA}initial_password_hash
+createTimestamp: 20251124000000Z

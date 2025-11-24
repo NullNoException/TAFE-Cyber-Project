@@ -1,0 +1,235 @@
+###############################################################################
+# Traefik Dynamic Configuration - Simplified for Docker Services
+###############################################################################
+
+http:
+  middlewares:
+    # Security headers
+    security-headers:
+      headers:
+        customResponseHeaders:
+          X-Frame-Options: "SAMEORIGIN"
+          X-Content-Type-Options: "nosniff"
+          X-XSS-Protection: "1; mode=block"
+          Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+          X-Permitted-Cross-Domain-Policies: "none"
+          Referrer-Policy: "strict-origin-when-cross-origin"
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+
+    # Compression
+    compression:
+      compress: {}
+
+    # Authentication for Wazuh APIs (basic auth placeholder)
+    auth-wazuh:
+      basicAuth:
+        users:
+          - "admin:$apr1$r31.....$HqJZimcKQFAMYayBlzkrA/"  # Generate with: htpasswd -c auth admin
+
+    # Rate limiting for API endpoints
+    rate-limit-api:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: "1m"
+
+  routers:
+    # NeuVector Console
+    neuvector:
+      rule: "Host(`neuvector.cyberlab.local`) || Host(`security.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "neuvector"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+
+    # Nginx Web Server
+    nginx:
+      rule: "Host(`web.cyberlab.local`) || Host(`www.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "nginx"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+
+    # Traefik Dashboard
+    traefik-dashboard:
+      rule: "Host(`traefik.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "api@internal"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+
+    # =========================================================================
+    # WAZUH SERVICES ROUTERS (via Traefik)
+    # =========================================================================
+
+    # Wazuh Dashboard Web UI
+    wazuh-dashboard:
+      rule: "Host(`wazuh.cyberlab.local`) || Host(`dashboard.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "wazuh-dashboard-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+
+    # Wazuh Manager API
+    wazuh-manager-api:
+      rule: "Host(`wazuh-api.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "wazuh-manager-api-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "auth-wazuh"
+
+    # Wazuh Indexer (OpenSearch)
+    wazuh-indexer:
+      rule: "Host(`indexer.cyberlab.local`) || Host(`opensearch.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "wazuh-indexer-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "auth-wazuh"
+
+    # LDAP Admin Interface (phpLDAPadmin)
+    phpldapadmin:
+      rule: "Host(`ldap.cyberlab.local`) || Host(`ldapadmin.cyberlab.local`) || Host(`directory.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "phpldapadmin-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+
+    # Suricata IDS/IPS Monitoring
+    suricata:
+      rule: "Host(`suricata.cyberlab.local`) || Host(`ids.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "suricata-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+
+    # OpenVPN Admin Panel
+    openvpn:
+      rule: "Host(`vpn.cyberlab.local`) || Host(`openvpn.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "openvpn-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+
+    # NOTE: If you need Traefik to serve a specific certificate per-domain, consider
+    # adding a file-provider router that references the backend service and uses a
+    # TLS store with a configured defaultCertificate. The 'certificates' field
+    # under a router 'tls' is not recognized by the current provider schema and
+    # will cause a file provider parse error.
+
+  services:
+    neuvector:
+      loadBalancer:
+        servers:
+          - url: "https://neuvector-allinone:8443"
+        serversTransport: "neuvector-transport"
+
+    nginx:
+      loadBalancer:
+        servers:
+          - url: "http://nginx:80"
+
+    # =========================================================================
+    # WAZUH SERVICES
+    # =========================================================================
+
+    wazuh-dashboard-svc:
+      loadBalancer:
+        servers:
+          - url: "https://wazuh.dashboard:5601"
+        serversTransport: "wazuh-transport"
+
+    wazuh-manager-api-svc:
+      loadBalancer:
+        servers:
+          - url: "https://wazuh.manager:55000"
+        serversTransport: "wazuh-manager-transport"
+
+    wazuh-indexer-svc:
+      loadBalancer:
+        servers:
+          - url: "https://wazuh.indexer:9200"
+        serversTransport: "wazuh-indexer-transport"
+
+    phpldapadmin-svc:
+      loadBalancer:
+        servers:
+          - url: "http://phpldapadmin:80"
+
+    suricata-svc:
+      loadBalancer:
+        servers:
+          - url: "http://suricata"
+
+    openvpn-svc:
+      loadBalancer:
+        servers:
+          - url: "https://openvpn:943"
+
+  serversTransports:
+      # Server transport for NeuVector and other HTTPS backends
+      neuvector-transport:
+        serverName: "neuvector.allinone"
+        insecureSkipVerify: true  # Lab environment: NeuVector uses self-signed certs
+      wazuh-transport:
+        # ServerName for the Wazuh Dashboard backend certificate (CN: wazuh.dashboard)
+        serverName: "wazuh.dashboard"
+        rootCAs:
+          - /etc/traefik/certs/root-ca.pem
+      # Wazuh manager (API) transport to validate the manager certificate
+      wazuh-manager-transport:
+        serverName: "wazuh.manager"
+        rootCAs:
+          - /etc/traefik/certs/root-ca.pem
+      # Wazuh indexer transport
+      wazuh-indexer-transport:
+        serverName: "wazuh.indexer"
+        rootCAs:
+          - /etc/traefik/certs/root-ca.pem
+
+tls:
+  options:
+    default:
+      minVersion: "VersionTLS12"
+      cipherSuites:
+        - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+        - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+        - "TLS_AES_128_GCM_SHA256"
+        - "TLS_AES_256_GCM_SHA384"
+        - "TLS_CHACHA20_POLY1305_SHA256"
+      curvePreferences:
+        - CurveP521
+        - CurveP384
+      sniStrict: false  # Disabled to allow default certificate fallback in lab
+      # preferServerCipherSuites deprecated: explicit preferServerCipherSuites removed
+
+    intermediate:
+      minVersion: "VersionTLS11"

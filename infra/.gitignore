@@ -1,0 +1,4 @@
+# Ignore Wazuh Indexer SSL certificates
+configs/wazuh/wazuh_indexer_ssl_certs/*.*
+configs/wireguard/*
+

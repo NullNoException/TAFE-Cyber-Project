@@ -1,0 +1,97 @@
+%YAML 1.1
+---
+
+# Suricata configuration file
+# Mode: IDS/IPS with packet capture and monitoring
+
+# Engine configuration
+engine-analysis-stats: yes
+
+vars:
+  address-groups:
+    HOME_NET: "[10.10.0.0/16]"
+    EXTERNAL_NET: "!$HOME_NET"
+    HTTP_SERVERS: "$HOME_NET"
+    SMTP_SERVERS: "$HOME_NET"
+    SQL_SERVERS: "$HOME_NET"
+    DNS_SERVERS: "$HOME_NET"
+    TELNET_SERVERS: "$HOME_NET"
+    AIM_SERVERS: "$EXTERNAL_NET"
+    DC_SERVERS: "$HOME_NET"
+    DNP3_SERVER: "$HOME_NET"
+    DNP3_CLIENT: "$HOME_NET"
+    MODBUS_CLIENT: "$HOME_NET"
+    MODBUS_SERVER: "$HOME_NET"
+    ENIP_CLIENT: "$HOME_NET"
+    ENIP_SERVER: "$HOME_NET"
+
+  port-groups:
+    HTTP_PORTS: "80"
+    SHELLCODE_PORTS: "!80"
+    ORACLE_PORTS: 1521
+    SSH_PORTS: 22
+    DNP3_PORTS: 20000
+    MODBUS_PORTS: 502
+    FILE_DATA_PORTS: "[$HTTP_PORTS,110,143]"
+    FTP_PORTS: 21
+    GENEVE_PORTS: 6081
+
+default-log-dir: /var/log/suricata
+
+outputs:
+  - fast:
+      enabled: yes
+      filename: fast.log
+      append: yes
+
+  - syslog:
+      enabled: yes
+      facility: local5
+      format: "[%i] <%d> -- %s"
+      identity: "suricata"
+
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - alert
+        - http
+        - dns
+        - tls
+        - smtp
+        - ssh
+        - stats
+        - flow
+        - anomaly
+
+  - http-log:
+      enabled: yes
+      filename: http.log
+      append: yes
+
+  - file-store:
+      enabled: no
+
+app-layer:
+  protocols:
+    dnp3:
+      enabled: yes
+    modbus:
+      enabled: yes
+    enip:
+      enabled: yes
+
+af-packet:
+  - interface: eth0
+    cluster-id: 99
+    cluster-type: cluster_flow
+    defrag: yes
+
+default-rule-path: /var/lib/suricata/rules
+rule-files:
+  - suricata.rules
+  - suricata-rules.rules
+
+classification-file: /etc/suricata/classification.config
+reference-config-file: /etc/suricata/reference.config
