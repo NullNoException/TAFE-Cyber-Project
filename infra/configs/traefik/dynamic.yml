@@ -194,7 +194,7 @@ http:
         - "security-headers"
         - "compression"      
 
-    # DNS Server Console - Management Network + Security Network
+    # DNS Server Console - Management Network Only (NO localhost/external access)
     dns-console:
       rule: "Host(`dns.cyberlab.local`) || Host(`dns-console.cyberlab.local`)"
       entryPoints:
@@ -204,7 +204,7 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
-        - "admin-only-access"
+        - "management-net-access"
 
     # Rocket.Chat - Internal Network + Management Network
     rocketchat:

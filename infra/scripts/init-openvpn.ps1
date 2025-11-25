@@ -122,21 +122,65 @@ if (-not (Test-Path $ldapAdminPwFile)) {
     docker exec $ContainerName "$OasScriptsDir/sacli" start 2>$null | Out-Null
 
     Write-Host ""
+    Write-Host "Configuring VPN routing through workstation..." -ForegroundColor Cyan
+    
+    # Configure VPN to push routes to internal networks via workstation gateway
+    # VPN clients will route through 10.10.20.100 (workstation) to access all services
+    
+    Write-Host "Setting VPN network configuration..."
+    docker exec $ContainerName "$OasScriptsDir/sacli" --key "vpn.client.routing.reroute_gw" --value "false" ConfigPut
+    docker exec $ContainerName "$OasScriptsDir/sacli" --key "vpn.server.routing.private_network.0" --value "10.10.10.0/24" ConfigPut
+    docker exec $ContainerName "$OasScriptsDir/sacli" --key "vpn.server.routing.private_network.1" --value "10.10.20.0/24" ConfigPut
+    docker exec $ContainerName "$OasScriptsDir/sacli" --key "vpn.server.routing.private_network.2" --value "10.10.30.0/24" ConfigPut
+    docker exec $ContainerName "$OasScriptsDir/sacli" --key "vpn.server.routing.private_network.3" --value "10.10.40.0/24" ConfigPut
+    
+    # Set workstation as the gateway for VPN clients
+    docker exec $ContainerName "$OasScriptsDir/sacli" --key "vpn.server.routing.gateway_access" --value "true" ConfigPut
+    
+    # Enable IP forwarding in workstation
+    Write-Host "Enabling IP forwarding in workstation container..."
+    docker exec workstation bash -c "echo 1 > /proc/sys/net/ipv4/ip_forward" 2>$null | Out-Null
+    
+    # Add iptables rules in workstation for NAT/forwarding
+    Write-Host "Configuring NAT rules in workstation..."
+    docker exec workstation bash -c "iptables -t nat -A POSTROUTING -s 172.27.232.0/24 -o eth0 -j MASQUERADE" 2>$null | Out-Null
+    docker exec workstation bash -c "iptables -A FORWARD -i eth0 -j ACCEPT" 2>$null | Out-Null
+    docker exec workstation bash -c "iptables -A FORWARD -o eth0 -j ACCEPT" 2>$null | Out-Null
+    
+    Write-Host "Restarting OpenVPN-AS to apply routing configuration..."
+    docker exec $ContainerName "$OasScriptsDir/sacli" start 2>$null | Out-Null
+    
+    Write-Host ""
+    Write-Host "VPN routing configured successfully!" -ForegroundColor Green
+    Write-Host ""
     Write-Host "Next steps:" -ForegroundColor Cyan
-    Write-Host '  1) Open the OpenVPN-AS admin UI:'
+    Write-Host "  1) Add hosts entries on your LOCAL machine (not in containers):" -ForegroundColor Yellow
+    Write-Host "       10.10.10.5       traefik.cyberlab.local" -ForegroundColor White
+    Write-Host "       10.10.30.25      wazuh.cyberlab.local" -ForegroundColor White
+    Write-Host "       10.10.0.10       neuvector.cyberlab.local" -ForegroundColor White
+    Write-Host "       10.10.20.30      ldap.cyberlab.local" -ForegroundColor White
+    Write-Host "       10.10.10.50      dns.cyberlab.local" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  2) Open the OpenVPN-AS admin UI:" -ForegroundColor Yellow
     Write-Host "       https://$($HostIP):943/admin"
     Write-Host "     Login with:"
     Write-Host "       Username: $AdminUser"
     Write-Host "       Password: contents of $AdminPwFile"
     Write-Host ""
-    Write-Host '  2) Create LDAP users in phpLDAPadmin under dc=cyberlab,dc=local'
-    Write-Host '     with a ''uid'' attribute (e.g. uid=alice).'
+    Write-Host "  3) Create LDAP users in phpLDAPadmin under dc=cyberlab,dc=local" -ForegroundColor Yellow
+    Write-Host "     with a 'uid' attribute (e.g. uid=alice)."
     Write-Host ""
-    Write-Host '  3) Test LDAP login to OpenVPN:'
-    Write-Host '       - Use username = uid from LDAP (e.g. alice)'
-    Write-Host '       - Use the LDAP user password you set in phpLDAPadmin.'
-    Write-Host ''
-    Write-Host '  4) (Optional) Download or verify a client profile from the OpenVPN'
-    Write-Host "     user portal: https://$($HostIP):943/"
+    Write-Host "  4) Test LDAP login to OpenVPN:" -ForegroundColor Yellow
+    Write-Host "       - Use username = uid from LDAP (e.g. alice)"
+    Write-Host "       - Use the LDAP user password you set in phpLDAPadmin."
+    Write-Host ""
+    Write-Host "  5) Download VPN client profile:" -ForegroundColor Yellow
+    Write-Host "       https://$($HostIP):943/"
+    Write-Host ""
+    Write-Host "  6) Once connected via VPN, access services at:" -ForegroundColor Yellow
+    Write-Host "       https://traefik.cyberlab.local (only accessible through VPN)"
+    Write-Host "       https://wazuh.cyberlab.local (only accessible through VPN)"
+    Write-Host "       https://neuvector.cyberlab.local (only accessible through VPN)"
+    Write-Host "       https://ldap.cyberlab.local (only accessible through VPN)"
+    Write-Host ""
 }
-

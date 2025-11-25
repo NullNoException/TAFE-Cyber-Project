@@ -143,8 +143,8 @@ services:
     networks:
       external_net:
         ipv4_address: 10.10.0.20
-      management_net:
-        ipv4_address: 10.10.40.60
+      internal_net:
+        ipv4_address: 10.10.20.201
     environment:
       - PUID=1000
       - PGID=1000
@@ -191,7 +191,7 @@ services:
       management_net:
         ipv4_address: 10.10.40.50
     ports:
-      - "5380:5380/tcp" # DNS web console (HTTP)
+      # Port 5380 (DNS web console) NOT exposed - access via Traefik only
       - "53:53/udp" # DNS service
       - "53:53/tcp" # DNS service
     environment:
@@ -494,15 +494,23 @@ services:
     # NOTE: Access controlled via Traefik dynamic.yml (internal-net-access middleware)
 
   # ---------------------------------------------------------------------------
-  # Workstation - GUI Desktop for Client Access (NEW)
+  # Workstation - GUI Desktop for Client Access (VPN Gateway)
   # ---------------------------------------------------------------------------
   workstation:
     image: dorowu/ubuntu-desktop-lxde-vnc:latest
     container_name: workstation
     hostname: workstation
+    cap_add:
+      - NET_ADMIN
     networks:
       internal_net:
         ipv4_address: 10.10.20.100
+      dmz_net:
+        ipv4_address: 10.10.10.100
+      security_net:
+        ipv4_address: 10.10.30.100
+      management_net:
+        ipv4_address: 10.10.40.100
     environment:
       - VNC_PASSWORD=cyberlab123
       - TZ=UTC
@@ -698,7 +706,7 @@ services:
       - suricata_logs:/var/log/suricata
       - suricata_rules:/var/lib/suricata
       - ./configs/suricata/suricata.yaml:/etc/suricata/suricata.yaml
-      - ./configs/suricata/suricata-rules.rules:/var/lib/suricata/suricata-rules.rules
+      - ./configs/suricata/suricata.rules:/var/lib/suricata/suricata.rules
     environment:
       - TZ=UTC
     command: -i eth0 -l /var/log/suricata
