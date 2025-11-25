@@ -1,0 +1,74 @@
+$TTL 86400
+@   IN  SOA ns1.cyberlab.local. admin.cyberlab.local. (
+            2025112501  ; Serial
+            3600        ; Refresh (1 hour)
+            1800        ; Retry (30 minutes)
+            604800      ; Expire (1 week)
+            86400       ; Minimum TTL (1 day)
+            )
+
+; Nameservers
+@   IN  NS  ns1.cyberlab.local.
+ns1 IN  A   10.10.30.100
+
+; Infrastructure Services
+traefik             IN  A   10.10.10.5
+nginx               IN  A   10.10.10.10
+web                 IN  A   10.10.10.10
+www                 IN  A   10.10.10.10
+
+; Security Services
+neuvector           IN  A   10.10.10.5
+security            IN  A   10.10.10.5
+ids                 IN  A   10.10.30.25
+
+; Wazuh Services
+wazuh               IN  A   10.10.10.5
+wazuh.manager       IN  A   10.10.10.5
+wazuh.dashboard     IN  A   10.10.10.5
+dashboard           IN  A   10.10.10.5
+wazuh.indexer       IN  A   10.10.10.5
+wazuh-api           IN  A   10.10.10.5
+indexer             IN  A   10.10.10.5
+opensearch          IN  A   10.10.10.5
+
+; Directory Services
+openldap            IN  A   10.10.20.40
+ldap                IN  A   10.10.20.40
+directory           IN  A   10.10.20.40
+phpldapadmin        IN  A   10.10.20.41
+ldapadmin           IN  A   10.10.20.41
+ldap-admin          IN  A   10.10.20.41
+
+; VPN Services
+openvpn             IN  A   10.10.0.20
+vpn                 IN  A   10.10.0.20
+vpn-admin           IN  A   10.10.0.20
+
+; Communication Services
+rocketchat          IN  A   10.10.20.50
+chat                IN  A   10.10.20.50
+
+; Monitoring & Analytics
+suricata            IN  A   10.10.30.25
+prometheus          IN  A   10.10.40.10
+grafana             IN  A   10.10.40.11
+node-exporter       IN  A   10.10.40.40
+
+; User Workstation
+workstation         IN  A   10.10.20.100
+desktop             IN  A   10.10.20.100
+
+; Database Services
+postgres            IN  A   10.10.20.30
+postgresql          IN  A   10.10.20.30
+mongodb             IN  A   10.10.20.51
+
+; Management & Admin
+management          IN  A   10.10.40.1
+admin               IN  A   10.10.40.1
+
+; DNS Server
+dns                 IN  A   10.10.30.100
+dns-server          IN  A   10.10.30.100
+dns-console         IN  A   10.10.30.100

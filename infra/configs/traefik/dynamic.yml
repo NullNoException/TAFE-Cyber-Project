@@ -62,13 +62,14 @@ http:
           - "10.10.40.0/24"     # Management Network
           - "127.0.0.1/32"      # Localhost (Docker)
 
-    # Restricted: Management Network + Security Network only
+    # Restricted: Management Network + Security Network + Internal Network
     admin-only-access:
       ipWhiteList:
         sourceRange:
-          - "10.10.40.0/24"     # Management Network
-          - "10.10.30.0/24"     # Security Network (for monitoring)
-          - "127.0.0.1/32"      # Localhost (Docker)
+          - "10.10.20.100/32"     # Traefik Dashboard
+          - "10.10.20.254/32"     # Neuvector Admin
+          - "10.10.30.21/32"
+          - "127.0.0.1/32"        # Localhost (Docker)
 
     # Public Services (DMZ) - External + Internal
     public-services-access:
@@ -82,7 +83,7 @@ http:
           - "127.0.0.1/32"      # Localhost (Docker)
 
   routers:
-    # NeuVector Console - Security Network + Management Network
+    # NeuVector Console - Direct proxy to NeuVector on DMZ IP
     neuvector:
       rule: "Host(`neuvector.cyberlab.local`) || Host(`security.cyberlab.local`)"
       entryPoints:
@@ -92,7 +93,7 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
-        - "security-net-access"
+        - "admin-only-access"
 
     # Nginx Web Server - Public Services (DMZ/Internal)
     nginx:
@@ -106,7 +107,7 @@ http:
         - "compression"
         - "public-services-access"
 
-    # Traefik Dashboard - Admin Only (Management Network)
+    # Traefik Dashboard - Admin Only
     traefik-dashboard:
       rule: "Host(`traefik.cyberlab.local`)"
       entryPoints:
@@ -132,7 +133,7 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
-        - "security-net-access"
+        - "admin-only-access"
 
     # Wazuh Manager API - Security Network + Management Network
     wazuh-manager-api:
@@ -157,6 +158,7 @@ http:
         - "security-headers"
         - "auth-wazuh"
         - "security-net-access"
+        
 
     # LDAP Admin Interface (phpLDAPadmin) - Internal + Security + Management Networks
     phpldapadmin:
@@ -240,7 +242,7 @@ http:
     neuvector:
       loadBalancer:
         servers:
-          - url: "https://neuvector-allinone:8443"
+          - url: "https://neuvector.allinone:8443"
         serversTransport: "neuvector-transport"
 
     nginx:
@@ -313,18 +315,22 @@ http:
       wazuh-transport:
         # ServerName for the Wazuh Dashboard backend certificate (CN: wazuh.dashboard)
         serverName: "wazuh.dashboard"
-        rootCAs:
-          - /etc/traefik/certs/root-ca.pem
+        insecureSkipVerify: true
+        # rootCAs:
+        #   - /etc/traefik/certs/root-ca.pem
       # Wazuh manager (API) transport to validate the manager certificate
       wazuh-manager-transport:
         serverName: "wazuh.manager"
-        rootCAs:
-          - /etc/traefik/certs/root-ca.pem
+        insecureSkipVerify: true
+        # rootCAs:
+        #   - /etc/traefik/certs/root-ca.pem
+        
       # Wazuh indexer transport
       wazuh-indexer-transport:
         serverName: "wazuh.indexer"
-        rootCAs:
-          - /etc/traefik/certs/root-ca.pem
+        insecureSkipVerify: true
+        # rootCAs:
+        #   - /etc/traefik/certs/root-ca.pem
 
 tls:
   options:

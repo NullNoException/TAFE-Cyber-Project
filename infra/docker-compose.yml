@@ -173,48 +173,62 @@ services:
   # ===========================================================================
 
   # ---------------------------------------------------------------------------
-  # DNS Server - Technitium DNS Server
+  # DNS Server - BIND9 DNS for cyberlab.local Domain
   # ---------------------------------------------------------------------------
   dns-server:
-    image: technitium/dns-server:latest
+    image: ubuntu/bind9:latest
     container_name: dns-server
     hostname: dns-server
     networks:
-      external_net:
-        ipv4_address: 10.10.0.50
-      dmz_net:
-        ipv4_address: 10.10.10.50
-      internal_net:
-        ipv4_address: 10.10.20.50
       security_net:
-        ipv4_address: 10.10.30.50
+        ipv4_address: 10.10.30.101
       management_net:
-        ipv4_address: 10.10.40.50
+        ipv4_address: 10.10.40.101
+      internal_net:
+        ipv4_address: 10.10.20.251
     ports:
-      # Port 5380 (DNS web console) NOT exposed - access via Traefik only
-      - "53:53/udp" # DNS service
-      - "53:53/tcp" # DNS service
+      - "53:53/tcp"
+      - "53:53/udp"
     environment:
-      - DNS_SERVER_DOMAIN=dns-server
-      - DNS_SERVER_RECURSION=AllowOnlyForPrivateNetworks
-      - DNS_SERVER_LOG_USING_LOCAL_TIME=true
       - TZ=UTC
     volumes:
-      - dns_config:/etc/dns
+      # BIND configuration
+      - ./configs/bind/named.conf:/etc/bind/named.conf:ro
+      # Zone files
+      - ./configs/bind/db.cyberlab.local:/etc/bind/zones/db.cyberlab.local:ro
+      - ./configs/bind/db.10.10.0.rev:/etc/bind/zones/db.10.10.0.rev:ro
+      - ./configs/bind/db.10.10.10.rev:/etc/bind/zones/db.10.10.10.rev:ro
+      - ./configs/bind/db.10.10.20.rev:/etc/bind/zones/db.10.10.20.rev:ro
+      - ./configs/bind/db.10.10.30.rev:/etc/bind/zones/db.10.10.30.rev:ro
+      - ./configs/bind/db.10.10.40.rev:/etc/bind/zones/db.10.10.40.rev:ro
+      # Cache and logs
+      - dns_cache:/var/cache/bind
+      - dns_logs:/var/log/bind
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 256M
+        reservations:
+          cpus: "0.15"
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "dig", "@127.0.0.1", "cyberlab.local", "SOA"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     logging:
       driver: syslog
       options:
         syslog-address: "udp://10.10.30.20:514"
         tag: "dns-server"
-    deploy:
-      resources:
-        limits:
-          cpus: "0.3"
-          memory: 512M
+        syslog-format: "rfc5424"
     restart: unless-stopped
-    sysctls:
-      - net.ipv4.ip_local_port_range=1024 65535
-    # NOTE: Access controlled via Traefik dynamic.yml (admin-only-access middleware)
 
   # ---------------------------------------------------------------------------
   # Traefik - Reverse Proxy & Load Balancer (ENABLED)
@@ -232,6 +246,10 @@ services:
         ipv4_address: 10.10.20.5
       management_net:
         ipv4_address: 10.10.40.5
+    dns:
+      - 10.10.30.101
+      - 10.10.20.251
+      - 10.10.40.101
     ports:
       - "80:80"
       - "443:443"
@@ -295,6 +313,9 @@ services:
         ipv4_address: 10.10.10.10
       internal_net:
         ipv4_address: 10.10.20.10
+    dns:
+      - 10.10.30.101
+      - 10.10.20.251
     environment:
       - TZ=UTC
     volumes:
@@ -511,6 +532,10 @@ services:
         ipv4_address: 10.10.30.100
       management_net:
         ipv4_address: 10.10.40.100
+    dns:
+      - 10.10.30.101
+      - 10.10.20.251
+      - 10.10.40.101
     environment:
       - VNC_PASSWORD=cyberlab123
       - TZ=UTC
@@ -829,6 +854,10 @@ volumes:
   traefik_logs:
   nginx_logs:
   nginx_certs:
+
+  # DNS Server Volumes
+  dns_cache:
+  dns_logs:
 
   # Backup Storage
   backup_storage:

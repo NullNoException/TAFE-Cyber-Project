@@ -1,0 +1,21 @@
+$TTL 86400
+@   IN  SOA ns1.cyberlab.local. admin.cyberlab.local. (
+            2025112501
+            3600
+            1800
+            604800
+            86400
+            )
+@   IN  NS  ns1.cyberlab.local.
+ns1 IN  PTR ns1.cyberlab.local.
+
+5   IN  PTR traefik.cyberlab.local.
+10  IN  PTR wazuh-indexer.cyberlab.local.
+20  IN  PTR wazuh-manager.cyberlab.local.
+21  IN  PTR wazuh-dashboard.cyberlab.local.
+25  IN  PTR suricata.cyberlab.local.
+40  IN  PTR openldap.cyberlab.local.
+41  IN  PTR phpldapadmin.cyberlab.local.
+100 IN  PTR dns-server.cyberlab.local.
+250 IN  PTR openvpn.cyberlab.local.
+254 IN  PTR neuvector-allinone.cyberlab.local.
