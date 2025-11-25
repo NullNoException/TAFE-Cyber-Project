@@ -166,11 +166,7 @@ services:
     restart: unless-stopped
     depends_on:
       - neuvector-allinone
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.openvpn.rule=Host(`openvpn.cyberlab.local`) || Host(`vpn-admin.cyberlab.local`)"
-      - "traefik.http.routers.openvpn.entrypoints=web,websecure"
-      - "traefik.http.services.openvpn.loadbalancer.server.port=943"
+    # Traefik routing configured in configs/traefik/dynamic.yml
 
   # ===========================================================================
   # DMZ LAYER - PUBLIC FACING SERVICES

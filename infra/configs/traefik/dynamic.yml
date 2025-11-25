@@ -283,7 +283,8 @@ http:
     openvpn-svc:
       loadBalancer:
         servers:
-          - url: "http://openvpn:943"
+          - url: "https://openvpn:943"
+        serversTransport: "openvpn-transport"
 
     dns-console-svc:
       loadBalancer:
@@ -305,6 +306,10 @@ http:
       neuvector-transport:
         serverName: "neuvector.allinone"
         insecureSkipVerify: true  # Lab environment: NeuVector uses self-signed certs
+      # Server transport for OpenVPN Access Server
+      openvpn-transport:
+        serverName: "openvpn"
+        insecureSkipVerify: true  # Lab environment: OpenVPN uses self-signed certs
       wazuh-transport:
         # ServerName for the Wazuh Dashboard backend certificate (CN: wazuh.dashboard)
         serverName: "wazuh.dashboard"

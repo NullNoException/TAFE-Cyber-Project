@@ -3,7 +3,7 @@
 A comprehensive, production-grade cybersecurity lab environment for defensive security training, SIEM deployment, threat detection, and incident response. This infrastructure implements defense-in-depth with 5 isolated network segments, 15 integrated security services, and 300+ detection rules.
 
 **Status:** ✅ **Fully Operational** (Deployed: November 24, 2025)
-**Platform:** macOS/Linux with Docker
+**Platform:** Windows/macOS/Linux with Docker
 **Total Services:** 15 containers | **Network Segments:** 5 | **Detection Rules:** 300+
 
 ---
@@ -113,10 +113,91 @@ Traefik:10.10.0.30      DNS:10.10.10.50       Workstation, Backup
 
 ---
 
+## Windows-Specific Notes
+
+### PowerShell vs Bash Scripts
+
+This project includes scripts in both formats:
+- **PowerShell (`.ps1`)**: Native Windows scripts - use these when available
+- **Bash (`.sh`)**: Linux/macOS scripts - require Git Bash or WSL on Windows
+
+**Running Bash Scripts on Windows:**
+
+Option 1 - Git Bash (Recommended):
+```powershell
+# Install Git for Windows (includes Git Bash)
+# Download from: https://git-scm.com/download/win
+
+# Run bash scripts using Git Bash
+cd infra\scripts
+bash ./seed-ldap.sh
+```
+
+Option 2 - WSL2 (Windows Subsystem for Linux):
+```powershell
+# Enable WSL2 and install Ubuntu
+wsl --install
+
+# Access WSL
+wsl
+
+# Navigate to project
+cd /mnt/c/Users/Student/Documents/TAFE-Cyber-Project
+```
+
+### Docker Desktop Configuration
+
+For optimal performance on Windows:
+
+1. **Enable WSL2 Integration:**
+   - Docker Desktop → Settings → Resources → WSL Integration
+   - Enable integration with your WSL2 distros
+
+2. **Adjust Resource Limits:**
+   - Docker Desktop → Settings → Resources
+   - Memory: Minimum 8GB (16GB recommended)
+   - CPUs: 4+ cores recommended
+   - Disk: 50GB+ available
+
+3. **File Sharing:**
+   - Docker Desktop → Settings → Resources → File Sharing
+   - Ensure project directory is accessible
+
+### Path Differences
+
+Windows uses backslashes (`\`) in paths:
+```powershell
+# Windows
+cd C:\Users\Student\Documents\TAFE-Cyber-Project\infra\scripts
+
+# Inside Docker containers, always use forward slashes (/)
+docker exec openldap ls /etc/ldap
+```
+
+### PowerShell Execution Policy
+
+If you get an error running `.ps1` scripts:
+```powershell
+# Check current policy
+Get-ExecutionPolicy
+
+# Allow running local scripts (run as Administrator)
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+---
+
 ## Quick Start
 
 ### Start All Services
 
+**Windows (PowerShell):**
+```powershell
+cd infra
+docker compose up -d
+```
+
+**macOS/Linux (Bash):**
 ```bash
 cd infra
 docker-compose up -d
@@ -124,28 +205,30 @@ docker-compose up -d
 
 ### Check Service Status
 
-```bash
-docker-compose ps
+```powershell
+# Windows & macOS/Linux
+docker compose ps
 ```
 
 You should see all 15 services as `running`.
 
 ### View Logs
 
-```bash
+```powershell
 # View all logs
-docker-compose logs -f
+docker compose logs -f
 
 # View specific service logs
-docker-compose logs -f wazuh.manager
-docker-compose logs -f suricata
-docker-compose logs -f traefik
+docker compose logs -f wazuh.manager
+docker compose logs -f suricata
+docker compose logs -f traefik
 ```
 
 ### Stop All Services
 
-```bash
-docker-compose down
+```powershell
+# Windows & macOS/Linux
+docker compose down
 ```
 
 ---
@@ -154,32 +237,51 @@ docker-compose down
 
 ### System Requirements
 
-- **Docker Engine** (v20.10+)
-- **Docker Compose** (v2.0+)
-- **macOS/Linux** (Windows with WSL2 supported)
+- **Docker Desktop** (v20.10+) for Windows
+- **Docker Compose** (v2.0+) - included with Docker Desktop
+- **Windows 10/11** with WSL2 enabled OR **macOS/Linux**
 - **Memory:** 8GB minimum (16GB+ recommended)
 - **Storage:** 50GB+ available space for volumes and logs
 - **Network:** Static or reserved IP if accessing remotely
 
-### Software
+### Software Installation
 
-Ensure you have installed:
+**Windows (Recommended):**
+
+1. Install Docker Desktop for Windows:
+   - Download from https://www.docker.com/products/docker-desktop
+   - Ensure WSL2 integration is enabled during installation
+   - Restart computer after installation
+
+2. Verify installation in PowerShell:
+   ```powershell
+   docker --version
+   docker compose version
+   ```
+
+**macOS (using Homebrew):**
 
 ```bash
-# macOS (using Homebrew)
 brew install docker docker-compose
+docker --version
+docker-compose --version
+```
 
-# Linux (Ubuntu/Debian)
+**Linux (Ubuntu/Debian):**
+
+```bash
 sudo apt-get install docker.io docker-compose
-
-# Verify installation
 docker --version
 docker-compose --version
 ```
 
 ### Network Configuration
 
-Add DNS entries to your `/etc/hosts` (or `C:\Windows\System32\drivers\etc\hosts` on Windows):
+**Windows:** Add DNS entries to `C:\Windows\System32\drivers\etc\hosts` (requires Administrator privileges)
+
+**macOS/Linux:** Add DNS entries to `/etc/hosts`
+
+Open hosts file in text editor as Administrator/root and add:
 
 ```
 127.0.0.1       localhost
@@ -195,18 +297,46 @@ Add DNS entries to your `/etc/hosts` (or `C:\Windows\System32\drivers\etc\hosts`
 
 Or use the provided hosts file entries in `HOSTS_FILE_ENTRIES.txt`.
 
+**Windows Quick Edit (PowerShell as Administrator):**
+```powershell
+# Open hosts file in Notepad as Administrator
+notepad C:\Windows\System32\drivers\etc\hosts
+
+# Or append entries directly
+Get-Content HOSTS_FILE_ENTRIES.txt | Add-Content C:\Windows\System32\drivers\etc\hosts
+```
+
 ---
 
 ## Installation & Setup
 
 ### Step 1: Clone or Extract Project
 
+**Windows (PowerShell):**
+```powershell
+cd C:\Users\Student\Documents
+# If cloning from Git:
+git clone <repository-url> TAFE-Cyber-Project
+cd TAFE-Cyber-Project
+```
+
+**macOS/Linux:**
 ```bash
 cd /path/to/CyberSecurity-Diploma/Project
 ```
 
 ### Step 2: Configure Environment Variables
 
+**Windows (PowerShell):**
+```powershell
+# Copy template to create .env file
+Copy-Item infra\.env.template infra\.env
+
+# Edit .env with your desired values
+notepad infra\.env
+```
+
+**macOS/Linux (Bash):**
 ```bash
 # Copy template to create .env file
 cp infra/.env.template infra/.env
@@ -237,6 +367,15 @@ DOMAIN=cyberlab.local
 
 ### Step 3: Generate Passwords (Optional)
 
+**Windows (PowerShell):**
+```powershell
+cd infra\scripts
+# Use Git Bash or WSL to run bash script
+bash generate-passwords.sh
+# OR manually create password files in infra\secrets\
+```
+
+**macOS/Linux (Bash):**
 ```bash
 cd infra/scripts
 chmod +x generate-passwords.sh
@@ -245,8 +384,54 @@ chmod +x generate-passwords.sh
 
 This generates secure passwords and saves them to `infra/secrets/`.
 
-### Step 4: Start Infrastructure
+### Step 4: Generate Wazuh SSL Certificates
 
+Before starting the infrastructure, generate SSL certificates for Wazuh components:
+
+**Windows (PowerShell):**
+```powershell
+cd infra\configs\wazuh
+
+# Generate certificates using Docker
+docker compose -f generate-indexer-certs.yml run --rm generator
+
+# Verify certificates were created
+dir wazuh_indexer_ssl_certs
+```
+
+**macOS/Linux (Bash):**
+```bash
+cd infra/configs/wazuh
+
+# Generate certificates using Docker
+docker compose -f generate-indexer-certs.yml run --rm generator
+
+# Verify certificates were created
+ls -la wazuh_indexer_ssl_certs/
+```
+
+This creates the following certificates in `wazuh_indexer_ssl_certs/`:
+- `admin.pem` - Admin client certificate
+- `admin-key.pem` - Admin private key
+- `wazuh.indexer.pem` - Indexer node certificate
+- `wazuh.indexer-key.pem` - Indexer private key
+- `wazuh.manager.pem` - Manager node certificate
+- `wazuh.manager-key.pem` - Manager private key
+- `wazuh.dashboard.pem` - Dashboard node certificate
+- `wazuh.dashboard-key.pem` - Dashboard private key
+- `root-ca.pem` - Root Certificate Authority
+
+**Note:** These certificates are required for secure communication between Wazuh components. The generation only needs to be done once during initial setup.
+
+### Step 5: Start Infrastructure
+
+**Windows (PowerShell):**
+```powershell
+cd infra
+docker compose up -d
+```
+
+**macOS/Linux (Bash):**
 ```bash
 cd infra
 docker-compose up -d
@@ -254,10 +439,18 @@ docker-compose up -d
 
 Wait 60-90 seconds for all services to fully initialize.
 
-### Step 5: Initialize Services
+### Step 6: Initialize Services
 
 #### Seed LDAP Directory
 
+**Windows (PowerShell):**
+```powershell
+cd infra\scripts
+# Use Git Bash or WSL
+bash seed-ldap.sh
+```
+
+**macOS/Linux (Bash):**
 ```bash
 cd infra/scripts
 chmod +x seed-ldap.sh
@@ -271,14 +464,29 @@ This populates OpenLDAP with initial users and groups:
 
 #### Initialize DNS Server
 
+**Windows (PowerShell):**
+```powershell
+cd infra\scripts
+# Use Git Bash or WSL
+bash init-dns-tools.sh
+```
+
+**macOS/Linux (Bash):**
 ```bash
 cd infra/scripts
 chmod +x init-dns-tools.sh
 ./init-dns-tools.sh
 ```
 
-#### Initialize OpenVPN (Optional)
+#### Initialize OpenVPN
 
+**Windows (PowerShell - Native):**
+```powershell
+cd infra
+.\scripts\init-openvpn.ps1
+```
+
+**macOS/Linux (Bash):**
 ```bash
 cd infra/scripts
 chmod +x init-openvpn.sh
@@ -287,8 +495,16 @@ chmod +x init-openvpn.sh
 
 This configures the OpenVPN Access Server with admin credentials and generates client profiles.
 
-### Step 6: Verify Deployment
+### Step 7: Verify Deployment
 
+**Windows (PowerShell):**
+```powershell
+cd infra\scripts
+# Use Git Bash or WSL
+bash verify-network-access.sh
+```
+
+**macOS/Linux (Bash):**
 ```bash
 cd infra/scripts
 chmod +x verify-network-access.sh
@@ -946,6 +1162,50 @@ For issues, questions, or improvements:
 
 ## Quick Reference: Command Cheat Sheet
 
+### Windows (PowerShell)
+
+```powershell
+# Startup & Management
+cd infra; docker compose up -d              # Start all services
+docker compose down                         # Stop all services
+docker compose ps                           # Check status
+docker compose logs -f <service>            # View logs
+
+# Service Operations
+docker exec <service> <command>             # Execute in container
+docker compose restart <service>            # Restart service
+docker compose pull; docker compose up -d   # Update services
+
+# Scripts
+cd infra\scripts
+.\init-openvpn.ps1                          # Initialize OpenVPN (PowerShell)
+bash ./seed-ldap.sh                         # Initialize LDAP (Bash)
+bash ./verify-network-access.sh             # Test connectivity (Bash)
+python test-dns-advanced.py --export json   # Advanced DNS testing
+
+# Wazuh Certificates
+cd infra\configs\wazuh
+docker compose -f generate-indexer-certs.yml run --rm generator  # Generate certs
+dir wazuh_indexer_ssl_certs                 # Verify certificates
+
+# Troubleshooting
+docker stats                                # Resource usage
+docker volume ls                            # List volumes
+docker network ls                           # List networks
+docker logs <container>                     # View container logs
+
+# Backup & Restore
+docker exec backup ls /backups/             # List backups
+docker exec backup tar -xzf /backups/file.tar.gz -C /backup/  # Restore
+
+# Database Access
+docker exec postgresql psql -U postgres -c "\l"             # List PG databases
+docker exec mongodb mongosh -u root -p $env:MONGODB_PASSWORD  # Connect to MongoDB
+docker exec openldap ldapsearch -b "dc=cyberlab,dc=local" -x  # LDAP search
+```
+
+### macOS/Linux (Bash)
+
 ```bash
 # Startup & Management
 cd infra && docker-compose up -d          # Start all services
@@ -960,10 +1220,15 @@ docker-compose pull && docker-compose up -d  # Update services
 
 # Scripts
 cd infra/scripts
-./test-dns.sh all                          # Test DNS
-./verify-network-access.sh                 # Test connectivity
+./init-openvpn.sh                          # Initialize OpenVPN
 ./seed-ldap.sh                             # Initialize LDAP
+./verify-network-access.sh                 # Test connectivity
 python3 test-dns-advanced.py --export json # Advanced DNS testing
+
+# Wazuh Certificates
+cd infra/configs/wazuh
+docker compose -f generate-indexer-certs.yml run --rm generator  # Generate certs
+ls -la wazuh_indexer_ssl_certs/            # Verify certificates
 
 # Troubleshooting
 docker stats                               # Resource usage
@@ -985,6 +1250,6 @@ docker exec openldap ldapsearch -b "dc=cyberlab,dc=local" -x  # LDAP search
 
 **Last Updated:** November 25, 2025
 **Status:** ✅ Fully Operational
-**Platform:** macOS/Linux with Docker
+**Platform:** Windows/macOS/Linux with Docker Desktop
 
 For detailed information on specific services, configuration, and recovery procedures, refer to the additional documentation files included in the project.
