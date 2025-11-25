@@ -244,6 +244,8 @@ services:
         ipv4_address: 10.10.10.5
       internal_net:
         ipv4_address: 10.10.20.5
+      security_net:
+        ipv4_address: 10.10.30.5
       management_net:
         ipv4_address: 10.10.40.5
     dns:
@@ -267,6 +269,10 @@ services:
       - --entrypoints.websecure.address=:443
       - --entrypoints.metrics.address=:8082
       - --log.level=INFO
+    extra_hosts:
+      - "wazuh.dashboard:10.10.30.21"
+      - "wazuh.manager:10.10.30.20"
+      - "wazuh.indexer:10.10.30.10"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./configs/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
@@ -691,6 +697,9 @@ services:
       - 10.10.30.101
       - 10.10.20.251
       - 10.10.40.101
+    extra_hosts:
+      - "wazuh.indexer:10.10.30.10"
+      - "wazuh.manager:10.10.30.20"
     # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
     environment:
       - INDEXER_USERNAME=admin
