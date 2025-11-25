@@ -1,0 +1,88 @@
+###############################################################################
+# CyberLab Security Infrastructure - Traefik Service Resolution
+# Add these entries to your hosts file
+#
+# macOS/Linux:  /etc/hosts
+# Windows:      C:\Windows\System32\drivers\etc\hosts
+###############################################################################
+
+# Local Machine IP (Traefik reverse proxy)
+127.0.0.1 localhost
+
+# =========================================================================
+# Core Infrastructure
+# =========================================================================
+
+# Traefik Dashboard
+127.0.0.1 traefik.cyberlab.local
+
+# Nginx Web Server
+127.0.0.1 web.cyberlab.local
+127.0.0.1 www.cyberlab.local
+
+# NeuVector Container Security Platform
+127.0.0.1 neuvector.cyberlab.local
+127.0.0.1 security.cyberlab.local
+
+# =========================================================================
+# Wazuh SIEM (Security Information and Event Management)
+# =========================================================================
+
+# Wazuh Dashboard (Web UI)
+127.0.0.1 wazuh.cyberlab.local
+127.0.0.1 dashboard.cyberlab.local
+
+# Wazuh Manager API
+127.0.0.1 wazuh-api.cyberlab.local
+127.0.0.1 api.wazuh.local
+
+# Wazuh Indexer (OpenSearch)
+127.0.0.1 indexer.cyberlab.local
+127.0.0.1 opensearch.cyberlab.local
+127.0.0.1 search.cyberlab.local
+
+# =========================================================================
+# LDAP Directory Service
+# =========================================================================
+
+# phpLDAPadmin - LDAP Management Interface
+127.0.0.1 ldap.cyberlab.local
+127.0.0.1 ldapadmin.cyberlab.local
+127.0.0.1 directory.cyberlab.local
+
+# =========================================================================
+# Network Security Services
+# =========================================================================
+
+# Suricata IDS/IPS
+127.0.0.1 suricata.cyberlab.local
+127.0.0.1 ids.cyberlab.local
+127.0.0.1 ips.cyberlab.local
+
+# OpenVPN VPN Gateway
+127.0.0.1 vpn.cyberlab.local
+127.0.0.1 openvpn.cyberlab.local
+
+# =========================================================================
+# Optional Future Services (uncomment when enabled)
+# =========================================================================
+
+# Prometheus Metrics
+# 127.0.0.1 prometheus.cyberlab.local
+# 127.0.0.1 metrics.cyberlab.local
+
+# Grafana Monitoring Dashboard
+# 127.0.0.1 grafana.cyberlab.local
+# 127.0.0.1 monitoring.cyberlab.local
+
+# TheHive Incident Response Platform
+# 127.0.0.1 thehive.cyberlab.local
+# 127.0.0.1 incidents.cyberlab.local
+
+# Cortex Observable Analysis
+# 127.0.0.1 cortex.cyberlab.local
+# 127.0.0.1 analysis.cyberlab.local
+
+# Rocket.Chat Team Communication
+# 127.0.0.1 chat.cyberlab.local
+# 127.0.0.1 rocketchat.cyberlab.local

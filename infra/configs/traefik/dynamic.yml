@@ -34,8 +34,55 @@ http:
         burst: 200
         period: "1m"
 
+    # ==========================================================================
+    # NETWORK ACCESS CONTROL - IP Whitelisting for Security Services
+    # ==========================================================================
+
+    # Internal Network (10.10.20.0/24) - Protected Services
+    internal-net-access:
+      ipWhiteList:
+        sourceRange:
+          - "10.10.20.0/24"     # Internal Network
+          - "10.10.30.0/24"     # Security Network
+          - "10.10.40.0/24"     # Management Network
+          - "127.0.0.1/32"      # Localhost (Docker)
+
+    # Security Network (10.10.30.0/24) - Monitoring & Analysis Only
+    security-net-access:
+      ipWhiteList:
+        sourceRange:
+          - "10.10.30.0/24"     # Security Network
+          - "10.10.40.0/24"     # Management Network
+          - "127.0.0.1/32"      # Localhost (Docker)
+
+    # Management Network (10.10.40.0/24) - Admin Interfaces
+    management-net-access:
+      ipWhiteList:
+        sourceRange:
+          - "10.10.40.0/24"     # Management Network
+          - "127.0.0.1/32"      # Localhost (Docker)
+
+    # Restricted: Management Network + Security Network only
+    admin-only-access:
+      ipWhiteList:
+        sourceRange:
+          - "10.10.40.0/24"     # Management Network
+          - "10.10.30.0/24"     # Security Network (for monitoring)
+          - "127.0.0.1/32"      # Localhost (Docker)
+
+    # Public Services (DMZ) - External + Internal
+    public-services-access:
+      ipWhiteList:
+        sourceRange:
+          - "10.10.0.0/24"      # External Network (VPN)
+          - "10.10.10.0/24"     # DMZ Network
+          - "10.10.20.0/24"     # Internal Network
+          - "10.10.30.0/24"     # Security Network
+          - "10.10.40.0/24"     # Management Network
+          - "127.0.0.1/32"      # Localhost (Docker)
+
   routers:
-    # NeuVector Console
+    # NeuVector Console - Security Network + Management Network
     neuvector:
       rule: "Host(`neuvector.cyberlab.local`) || Host(`security.cyberlab.local`)"
       entryPoints:
@@ -45,8 +92,9 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
+        - "security-net-access"
 
-    # Nginx Web Server
+    # Nginx Web Server - Public Services (DMZ/Internal)
     nginx:
       rule: "Host(`web.cyberlab.local`) || Host(`www.cyberlab.local`)"
       entryPoints:
@@ -56,8 +104,9 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
+        - "public-services-access"
 
-    # Traefik Dashboard
+    # Traefik Dashboard - Admin Only (Management Network)
     traefik-dashboard:
       rule: "Host(`traefik.cyberlab.local`)"
       entryPoints:
@@ -67,12 +116,13 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
+        - "admin-only-access"
 
     # =========================================================================
     # WAZUH SERVICES ROUTERS (via Traefik)
     # =========================================================================
 
-    # Wazuh Dashboard Web UI
+    # Wazuh Dashboard Web UI - Security Network + Management Network
     wazuh-dashboard:
       rule: "Host(`wazuh.cyberlab.local`) || Host(`dashboard.cyberlab.local`)"
       entryPoints:
@@ -82,8 +132,9 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
+        - "security-net-access"
 
-    # Wazuh Manager API
+    # Wazuh Manager API - Security Network + Management Network
     wazuh-manager-api:
       rule: "Host(`wazuh-api.cyberlab.local`)"
       entryPoints:
@@ -93,8 +144,9 @@ http:
       middlewares:
         - "security-headers"
         - "auth-wazuh"
+        - "security-net-access"
 
-    # Wazuh Indexer (OpenSearch)
+    # Wazuh Indexer (OpenSearch) - Security Network + Management Network
     wazuh-indexer:
       rule: "Host(`indexer.cyberlab.local`) || Host(`opensearch.cyberlab.local`)"
       entryPoints:
@@ -104,8 +156,9 @@ http:
       middlewares:
         - "security-headers"
         - "auth-wazuh"
+        - "security-net-access"
 
-    # LDAP Admin Interface (phpLDAPadmin)
+    # LDAP Admin Interface (phpLDAPadmin) - Internal + Security + Management Networks
     phpldapadmin:
       rule: "Host(`ldap.cyberlab.local`) || Host(`ldapadmin.cyberlab.local`) || Host(`directory.cyberlab.local`)"
       entryPoints:
@@ -115,8 +168,9 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
+        - "internal-net-access"
 
-    # Suricata IDS/IPS Monitoring
+    # Suricata IDS/IPS Monitoring - Security Network + Management Network
     suricata:
       rule: "Host(`suricata.cyberlab.local`) || Host(`ids.cyberlab.local`)"
       entryPoints:
@@ -126,17 +180,55 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
+        - "security-net-access"
 
-    # OpenVPN Admin Panel
+    # OpenVPN Admin Panel - Public Access
     openvpn:
-      rule: "Host(`vpn.cyberlab.local`) || Host(`openvpn.cyberlab.local`)"
+      rule: "Host(`vpn.cyberlab.local`) || Host(`openvpn.cyberlab.local`) || Host(`vpn-admin.cyberlab.local`)"
       entryPoints:
+        - "web"
         - "websecure"
       service: "openvpn-svc"
       tls: {}
       middlewares:
         - "security-headers"
+        - "compression"      
+
+    # DNS Server Console - Management Network + Security Network
+    dns-console:
+      rule: "Host(`dns.cyberlab.local`) || Host(`dns-console.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "dns-console-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
         - "compression"
+        - "admin-only-access"
+
+    # Rocket.Chat - Internal Network + Management Network
+    rocketchat:
+      rule: "Host(`chat.cyberlab.local`) || Host(`rocketchat.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "rocketchat-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+        - "internal-net-access"
+
+    # Workstation Desktop - Internal Network + Management Network
+    workstation:
+      rule: "Host(`workstation.cyberlab.local`) || Host(`desktop.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "workstation-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+        - "internal-net-access"
 
     # NOTE: If you need Traefik to serve a specific certificate per-domain, consider
     # adding a file-provider router that references the backend service and uses a
@@ -191,7 +283,22 @@ http:
     openvpn-svc:
       loadBalancer:
         servers:
-          - url: "https://openvpn:943"
+          - url: "http://openvpn:943"
+
+    dns-console-svc:
+      loadBalancer:
+        servers:
+          - url: "http://dns-server:5380"
+
+    rocketchat-svc:
+      loadBalancer:
+        servers:
+          - url: "http://rocketchat:3000"
+
+    workstation-svc:
+      loadBalancer:
+        servers:
+          - url: "http://workstation:80"
 
   serversTransports:
       # Server transport for NeuVector and other HTTPS backends

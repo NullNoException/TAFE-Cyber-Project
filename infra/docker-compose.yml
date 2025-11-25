@@ -133,6 +133,13 @@ services:
     image: openvpn/openvpn-as:latest
     container_name: openvpn
     hostname: openvpn
+    privileged: false
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    devices:
+      - /dev/net/tun:/dev/net/tun
     networks:
       external_net:
         ipv4_address: 10.10.0.20
@@ -143,10 +150,9 @@ services:
       - PGID=1000
       - TZ=UTC
     ports:
-      - "943:943" # Web UI (accessible via management network at 10.10.40.60:943)
-      - "1194:1194/udp" # VPN Protocol
+      - "1194:1194/udp" # VPN Protocol (direct access)
     volumes:
-      - ./configs/openvpn:/openvpn
+      - openvpn_data:/openvpn
     logging:
       driver: syslog
       options:
@@ -163,13 +169,56 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.openvpn.rule=Host(`openvpn.cyberlab.local`) || Host(`vpn-admin.cyberlab.local`)"
-      - "traefik.http.routers.openvpn.entrypoints=websecure"
-      - "traefik.http.routers.openvpn.tls=true"
+      - "traefik.http.routers.openvpn.entrypoints=web,websecure"
       - "traefik.http.services.openvpn.loadbalancer.server.port=943"
 
   # ===========================================================================
   # DMZ LAYER - PUBLIC FACING SERVICES
   # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # DNS Server - Technitium DNS Server
+  # ---------------------------------------------------------------------------
+  dns-server:
+    image: technitium/dns-server:latest
+    container_name: dns-server
+    hostname: dns-server
+    networks:
+      external_net:
+        ipv4_address: 10.10.0.50
+      dmz_net:
+        ipv4_address: 10.10.10.50
+      internal_net:
+        ipv4_address: 10.10.20.50
+      security_net:
+        ipv4_address: 10.10.30.50
+      management_net:
+        ipv4_address: 10.10.40.50
+    ports:
+      - "5380:5380/tcp" # DNS web console (HTTP)
+      - "53:53/udp" # DNS service
+      - "53:53/tcp" # DNS service
+    environment:
+      - DNS_SERVER_DOMAIN=dns-server
+      - DNS_SERVER_RECURSION=AllowOnlyForPrivateNetworks
+      - DNS_SERVER_LOG_USING_LOCAL_TIME=true
+      - TZ=UTC
+    volumes:
+      - dns_config:/etc/dns
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "dns-server"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 512M
+    restart: unless-stopped
+    sysctls:
+      - net.ipv4.ip_local_port_range=1024 65535
+    # NOTE: Access controlled via Traefik dynamic.yml (admin-only-access middleware)
 
   # ---------------------------------------------------------------------------
   # Traefik - Reverse Proxy & Load Balancer (ENABLED)
@@ -234,7 +283,9 @@ services:
           memory: 512M
     depends_on:
       - neuvector-allinone
+      - dns-server
     restart: unless-stopped
+    # Traefik Dashboard routed via dynamic.yml (admin-only-access middleware)
 
   # ---------------------------------------------------------------------------
   # Nginx - Web Server (Behind Traefik)
@@ -268,12 +319,7 @@ services:
       - wazuh.manager
       - neuvector-allinone
     restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.nginx.rule=Host(`web.cyberlab.local`) || Host(`www.cyberlab.local`)"
-      - "traefik.http.routers.nginx.entrypoints=websecure"
-      - "traefik.http.routers.nginx.tls=true"
-      - "traefik.http.services.nginx.loadbalancer.server.port=80"
+    # NOTE: Access controlled via Traefik dynamic.yml (public-services-access middleware)
 
   # ===========================================================================
   # INTERNAL NETWORK - PROTECTED SERVICES
@@ -322,6 +368,8 @@ services:
         ipv4_address: 10.10.20.40
       security_net:
         ipv4_address: 10.10.30.40
+      management_net:
+        ipv4_address: 10.10.40.40
     environment:
       - LDAP_ORGANISATION=${LDAP_ORGANISATION:-CyberLab}
       - LDAP_DOMAIN=${LDAP_DOMAIN:-cyberlab.local}
@@ -351,6 +399,7 @@ services:
           cpus: "0.3"
           memory: 512M
     restart: unless-stopped
+    entrypoint: sh -c "(apt-get update && apt-get install -y dnsutils > /dev/null 2>&1 &) && exec /container/tool/run"
 
   # ---------------------------------------------------------------------------
   # phpLDAPadmin - LDAP Web Management Interface (ENABLED - FIXED)
@@ -382,12 +431,7 @@ services:
     depends_on:
       - openldap
     restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.ldap.rule=Host(`ldap.cyberlab.local`) || Host(`ldapadmin.cyberlab.local`) || Host(`directory.cyberlab.local`)"
-      - "traefik.http.routers.ldap.entrypoints=websecure"
-      - "traefik.http.routers.ldap.tls=true"
-      - "traefik.http.services.ldap.loadbalancer.server.port=80"
+    # NOTE: Access controlled via Traefik dynamic.yml (internal-net-access middleware)
 
   # ---------------------------------------------------------------------------
   # MongoDB - Document Database (For Rocket.Chat)
@@ -451,12 +495,7 @@ services:
           cpus: "0.5"
           memory: 1G
     restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.chat.rule=Host(`chat.cyberlab.local`) || Host(`rocketchat.cyberlab.local`)"
-      - "traefik.http.routers.chat.entrypoints=websecure"
-      - "traefik.http.routers.chat.tls=true"
-      - "traefik.http.services.chat.loadbalancer.server.port=3000"
+    # NOTE: Access controlled via Traefik dynamic.yml (internal-net-access middleware)
 
   # ---------------------------------------------------------------------------
   # Workstation - GUI Desktop for Client Access (NEW)
@@ -482,12 +521,7 @@ services:
           cpus: "2.0"
           memory: 2G
     restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.workstation.rule=Host(`workstation.cyberlab.local`) || Host(`desktop.cyberlab.local`)"
-      - "traefik.http.routers.workstation.entrypoints=websecure"
-      - "traefik.http.routers.workstation.tls=true"
-      - "traefik.http.services.workstation.loadbalancer.server.port=80"
+    # NOTE: Access controlled via Traefik dynamic.yml (internal-net-access middleware)
 
   # ===========================================================================
   # SECURITY NETWORK - MONITORING & ANALYSIS
@@ -508,13 +542,7 @@ services:
         ipv4_address: 10.10.30.10
       management_net:
         ipv4_address: 10.10.40.10
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.wazuh-indexer.rule=Host(`indexer.cyberlab.local`) || Host(`opensearch.cyberlab.local`)"
-      - "traefik.http.routers.wazuh-indexer.entrypoints=websecure"
-      - "traefik.http.routers.wazuh-indexer.tls=true"
-      - "traefik.http.services.wazuh-indexer.loadbalancer.server.port=9200"
-      - "traefik.http.services.wazuh-indexer.loadbalancer.server.scheme=https"
+    # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
     environment:
       - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
       - TZ=UTC
@@ -559,13 +587,7 @@ services:
         ipv4_address: 10.10.10.60
       management_net:
         ipv4_address: 10.10.40.20
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.wazuh-api.rule=Host(`wazuh-api.cyberlab.local`) || Host(`api.wazuh.local`)"
-      - "traefik.http.routers.wazuh-api.entrypoints=websecure"
-      - "traefik.http.routers.wazuh-api.tls=true"
-      - "traefik.http.services.wazuh-api.loadbalancer.server.port=55000"
-      - "traefik.http.services.wazuh-api.loadbalancer.server.scheme=https"
+    # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
     ports:
       - "514:514/udp"
       - "1514:1514"
@@ -604,6 +626,7 @@ services:
       - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.manager.pem:/etc/ssl/filebeat.pem
       - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.manager-key.pem:/etc/ssl/filebeat.key
       - ./configs/wazuh/wazuh_cluster/wazuh_manager.conf:/wazuh-config-mount/etc/ossec.conf
+    entrypoint: sh -c "(apt-get update && apt-get install -y dnsutils > /dev/null 2>&1 &) && exec /init"
     logging:
       driver: syslog
       options:
@@ -627,13 +650,7 @@ services:
         ipv4_address: 10.10.30.21
       management_net:
         ipv4_address: 10.10.40.21
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.wazuh-dashboard.rule=Host(`wazuh.cyberlab.local`) || Host(`dashboard.cyberlab.local`)"
-      - "traefik.http.routers.wazuh-dashboard.entrypoints=websecure"
-      - "traefik.http.routers.wazuh-dashboard.tls=true"
-      - "traefik.http.services.wazuh-dashboard.loadbalancer.server.port=5601"
-      - "traefik.http.services.wazuh-dashboard.loadbalancer.server.scheme=https"
+    # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
     environment:
       - INDEXER_USERNAME=admin
       - INDEXER_PASSWORD=SecurePassword123
@@ -700,11 +717,7 @@ services:
           cpus: "1.0"
           memory: 2G
     restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.suricata.rule=Host(`suricata.cyberlab.local`) || Host(`ids.cyberlab.local`)"
-      - "traefik.http.routers.suricata.entrypoints=websecure"
-      - "traefik.http.routers.suricata.tls=true"
+    # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
 
   # ===========================================================================
   # BACKUP SERVICE
@@ -801,6 +814,12 @@ volumes:
   suricata_logs:
   suricata_rules:
   neuvector_logs:
+
+  # OpenVPN Volume
+  openvpn_data:
+
+  # DNS Server Volume
+  dns_config:
 
   # Traefik & Nginx Volumes
   traefik_logs:
