@@ -123,7 +123,7 @@ http:
     # WAZUH SERVICES ROUTERS (via Traefik)
     # =========================================================================
 
-    # Wazuh Dashboard Web UI - Security Network + Management Network
+    # Wazuh Dashboard Web UI
     wazuh-dashboard:
       rule: "Host(`wazuh.cyberlab.local`) || Host(`dashboard.cyberlab.local`)"
       entryPoints:
@@ -133,9 +133,8 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
-        - "admin-only-access"
 
-    # Wazuh Manager API - Security Network + Management Network
+    # Wazuh Manager API
     wazuh-manager-api:
       rule: "Host(`wazuh-api.cyberlab.local`)"
       entryPoints:
@@ -145,9 +144,8 @@ http:
       middlewares:
         - "security-headers"
         - "auth-wazuh"
-        - "security-net-access"
 
-    # Wazuh Indexer (OpenSearch) - Security Network + Management Network
+    # Wazuh Indexer (OpenSearch)
     wazuh-indexer:
       rule: "Host(`indexer.cyberlab.local`) || Host(`opensearch.cyberlab.local`)"
       entryPoints:
@@ -157,7 +155,6 @@ http:
       middlewares:
         - "security-headers"
         - "auth-wazuh"
-        - "security-net-access"
         
 
     # LDAP Admin Interface (phpLDAPadmin) - Internal + Security + Management Networks

@@ -22,15 +22,17 @@ neuvector           IN  A   10.10.10.5
 security            IN  A   10.10.10.5
 ids                 IN  A   10.10.30.25
 
-; Wazuh Services
+; Wazuh Services - User-facing (through Traefik)
 wazuh               IN  A   10.10.10.5
-wazuh.manager       IN  A   10.10.10.5
 wazuh.dashboard     IN  A   10.10.10.5
 dashboard           IN  A   10.10.10.5
-wazuh.indexer       IN  A   10.10.10.5
 wazuh-api           IN  A   10.10.10.5
-indexer             IN  A   10.10.10.5
-opensearch          IN  A   10.10.10.5
+
+; Wazuh Services - Internal backend (direct access)
+wazuh.manager       IN  A   10.10.30.20
+wazuh.indexer       IN  A   10.10.30.10
+indexer             IN  A   10.10.30.10
+opensearch          IN  A   10.10.30.10
 
 ; Directory Services
 openldap            IN  A   10.10.20.40

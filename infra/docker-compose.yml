@@ -571,6 +571,10 @@ services:
         ipv4_address: 10.10.30.10
       management_net:
         ipv4_address: 10.10.40.10
+    dns:
+      - 10.10.30.101
+      - 10.10.20.251
+      - 10.10.40.101
     # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
     environment:
       - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
@@ -616,6 +620,10 @@ services:
         ipv4_address: 10.10.10.60
       management_net:
         ipv4_address: 10.10.40.20
+    dns:
+      - 10.10.30.101
+      - 10.10.20.251
+      - 10.10.40.101
     # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
     ports:
       - "514:514/udp"
@@ -679,6 +687,10 @@ services:
         ipv4_address: 10.10.30.21
       management_net:
         ipv4_address: 10.10.40.21
+    dns:
+      - 10.10.30.101
+      - 10.10.20.251
+      - 10.10.40.101
     # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
     environment:
       - INDEXER_USERNAME=admin
