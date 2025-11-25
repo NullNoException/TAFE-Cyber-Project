@@ -269,10 +269,10 @@ services:
       - --entrypoints.websecure.address=:443
       - --entrypoints.metrics.address=:8082
       - --log.level=INFO
-    extra_hosts:
-      - "wazuh.dashboard:10.10.30.21"
-      - "wazuh.manager:10.10.30.20"
-      - "wazuh.indexer:10.10.30.10"
+    # extra_hosts:
+    #   - "wazuh.dashboard:10.10.30.21"
+    #   - "wazuh.manager:10.10.30.20"
+    #   - "wazuh.indexer:10.10.30.10"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./configs/traefik/traefik.yml:/etc/traefik/traefik.yml:ro

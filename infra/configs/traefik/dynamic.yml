@@ -66,9 +66,12 @@ http:
     admin-only-access:
       ipWhiteList:
         sourceRange:
-          - "10.10.20.100/32"     # Traefik Dashboard
+          - "10.10.10.100/32"     # Workstation on DMZ
+          - "10.10.20.100/32"     # Workstation on Internal
           - "10.10.20.254/32"     # Neuvector Admin
-          - "10.10.30.21/32"
+          - "10.10.30.21/32"      # Wazuh Dashboard
+          - "10.10.30.100/32"     # Workstation on Security
+          - "10.10.40.100/32"     # Workstation on Management
           - "127.0.0.1/32"        # Localhost (Docker)
 
     # Public Services (DMZ) - External + Internal
