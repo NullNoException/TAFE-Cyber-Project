@@ -119,6 +119,18 @@ metrics:
     entryPoint: "metrics"
     addEntryPointsLabels: true
     addServicesLabels: true
+    addRoutersLabels: true
+    # Buckets for request duration histogram (in seconds)
+    buckets:
+      - 0.01
+      - 0.05
+      - 0.1
+      - 0.25
+      - 0.5
+      - 1
+      - 2.5
+      - 5
+      - 10
 
 # NeuVector integration via labels
 # Services can be protected by adding these labels:

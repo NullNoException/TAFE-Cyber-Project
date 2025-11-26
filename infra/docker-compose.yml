@@ -269,10 +269,17 @@ services:
       - --entrypoints.websecure.address=:443
       - --entrypoints.metrics.address=:8082
       - --log.level=INFO
-    # extra_hosts:
-    #   - "wazuh.dashboard:10.10.30.21"
-    #   - "wazuh.manager:10.10.30.20"
-    #   - "wazuh.indexer:10.10.30.10"
+      # Prometheus metrics
+      - --metrics.prometheus=true
+      - --metrics.prometheus.entrypoint=metrics
+      - --metrics.prometheus.addentrypointslabels=true
+      - --metrics.prometheus.addserviceslabels=true
+      - --metrics.prometheus.addrouterslabels=true
+      - --metrics.prometheus.buckets=0.01,0.05,0.1,0.25,0.5,1,2.5,5,10
+      # OTLP Tracing (HTTP endpoint for OpenTelemetry Collector)
+      - --tracing.otlp.http=true
+      - --tracing.otlp.http.endpoint=http://10.10.30.30:4318
+      - --tracing.otlp.samplerate=1.0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./configs/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
@@ -342,7 +349,9 @@ services:
       - wazuh.manager
       - neuvector-allinone
     restart: unless-stopped
-    # NOTE: Access controlled via Traefik dynamic.yml (public-services-access middleware)
+    labels:
+      - "traefik.enable=true"
+    # NOTE: Routing configured via Traefik dynamic.yml (nginx router)
 
   # ===========================================================================
   # INTERNAL NETWORK - PROTECTED SERVICES
@@ -378,6 +387,8 @@ services:
     depends_on:
       - wazuh.manager
     restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
 
   # ---------------------------------------------------------------------------
   # OpenLDAP - Directory Service (ENABLED & FIXED)
@@ -422,6 +433,8 @@ services:
           cpus: "0.3"
           memory: 512M
     restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
     entrypoint: sh -c "(apt-get update && apt-get install -y dnsutils > /dev/null 2>&1 &) && exec /container/tool/run"
 
   # ---------------------------------------------------------------------------
@@ -454,7 +467,9 @@ services:
     depends_on:
       - openldap
     restart: unless-stopped
-    # NOTE: Access controlled via Traefik dynamic.yml (internal-net-access middleware)
+    labels:
+      - "traefik.enable=true"
+    # NOTE: Routing configured via Traefik dynamic.yml (phpldapadmin router)
 
   # ---------------------------------------------------------------------------
   # MongoDB - Document Database (For Rocket.Chat)
@@ -482,6 +497,8 @@ services:
           cpus: "0.3"
           memory: 1G
     restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
 
   # ---------------------------------------------------------------------------
   # Rocket.Chat - Team Communication Platform
@@ -518,7 +535,9 @@ services:
           cpus: "0.5"
           memory: 1G
     restart: unless-stopped
-    # NOTE: Access controlled via Traefik dynamic.yml (internal-net-access middleware)
+    labels:
+      - "traefik.enable=true"
+    # NOTE: Routing configured via Traefik dynamic.yml (rocketchat router)
 
   # ---------------------------------------------------------------------------
   # Workstation - GUI Desktop for Client Access (VPN Gateway)
@@ -556,6 +575,8 @@ services:
           cpus: "2.0"
           memory: 2G
     restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
     # NOTE: Access controlled via Traefik dynamic.yml (internal-net-access middleware)
 
   # ===========================================================================
@@ -645,7 +666,7 @@ services:
     environment:
       - INDEXER_URL=https://wazuh.indexer:9200
       - INDEXER_USERNAME=admin
-      - INDEXER_PASSWORD=SecurePassword123
+      - INDEXER_PASSWORD=SecretPassword
       - FILEBEAT_SSL_VERIFICATION_MODE=full
       - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
       - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
@@ -658,7 +679,7 @@ services:
       - wazuh_etc:/var/ossec/etc
       - wazuh_logs:/var/ossec/logs
       - wazuh_queue:/var/ossec/queue
-      - wazuh_var_multigroups:/var/ossec/var/multigroups
+      # - wazuh_var_multigroups:/var/ossec/var/multigroups  # Removed due to init failure
       - wazuh_integrations:/var/ossec/integrations
       - wazuh_active_response:/var/ossec/active-response/bin
       - wazuh_agentless:/var/ossec/agentless
@@ -669,7 +690,6 @@ services:
       - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.manager.pem:/etc/ssl/filebeat.pem
       - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.manager-key.pem:/etc/ssl/filebeat.key
       - ./configs/wazuh/wazuh_cluster/wazuh_manager.conf:/wazuh-config-mount/etc/ossec.conf
-    entrypoint: sh -c "(apt-get update && apt-get install -y dnsutils > /dev/null 2>&1 &) && exec /init"
     logging:
       driver: syslog
       options:
@@ -703,7 +723,7 @@ services:
     # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
     environment:
       - INDEXER_USERNAME=admin
-      - INDEXER_PASSWORD=SecurePassword123
+      - INDEXER_PASSWORD=SecretPassword
       - WAZUH_API_URL=https://wazuh.manager
       - DASHBOARD_USERNAME=kibanaserver
       - DASHBOARD_PASSWORD=kibanaserver
@@ -771,6 +791,108 @@ services:
 
   # ===========================================================================
   # BACKUP SERVICE
+  # ===========================================================================
+  # MONITORING & OBSERVABILITY - GRAFANA & PROMETHEUS
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # Prometheus - Metrics Collection & Storage
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    hostname: prometheus
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.50
+    environment:
+      - TZ=UTC
+    # ports:
+    #   - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.external-url=https://prometheus.cyberlab.local"
+    volumes:
+      - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "prometheus"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    depends_on:
+      - traefik
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+    # NOTE: Routing configured via Traefik dynamic.yml (prometheus router)
+
+  # ---------------------------------------------------------------------------
+  # Grafana - Visualization & Dashboarding
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    hostname: grafana
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.60
+      management_net:
+        ipv4_address: 10.10.40.60
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-SecureG@fana1}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_DISABLE_BRUTE_FORCE_LOGIN_PROTECTION=false
+      - GF_SECURITY_LOGIN_MAXIMUM_INACTIVE_LIFETIME_DAYS=7
+      - GF_SERVER_ROOT_URL=https://grafana.cyberlab.local/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=Lax
+      - GF_SECURITY_COOKIE_HTTPONLY=true
+      - GF_LOG_MODE=console
+      - GF_LOG_LEVEL=info
+      - GF_SERVER_X_CONTENT_TYPE_OPTIONS=nosniff
+      - GF_SECURITY_X_FRAME_OPTIONS=SAMEORIGIN
+      - TZ=UTC
+    volumes:
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_storage:/var/lib/grafana
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "grafana"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    depends_on:
+      - prometheus
+      - traefik
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+    # NOTE: Routing configured via Traefik dynamic.yml (grafana router)
+
   # ===========================================================================
 
   # ---------------------------------------------------------------------------
@@ -879,6 +1001,10 @@ volumes:
   # DNS Server Volumes
   dns_cache:
   dns_logs:
+
+  # Monitoring Volumes
+  prometheus_data:
+  grafana_storage:
 
   # Backup Storage
   backup_storage:

@@ -1,6 +1,6 @@
 $TTL 86400
 @   IN  SOA ns1.cyberlab.local. admin.cyberlab.local. (
-            2025112501  ; Serial
+            2025112603  ; Serial
             3600        ; Refresh (1 hour)
             1800        ; Retry (30 minutes)
             604800      ; Expire (1 week)
@@ -51,10 +51,10 @@ vpn-admin           IN  A   10.10.0.20
 rocketchat          IN  A   10.10.20.50
 chat                IN  A   10.10.20.50
 
-; Monitoring & Analytics
-suricata            IN  A   10.10.30.25
-prometheus          IN  A   10.10.40.10
-grafana             IN  A   10.10.40.11
+; Monitoring & Analytics (routed through Traefik on security network)
+suricata            IN  A   10.10.30.70
+prometheus          IN  A   10.10.30.5
+grafana             IN  A   10.10.30.5
 node-exporter       IN  A   10.10.40.40
 
 ; User Workstation

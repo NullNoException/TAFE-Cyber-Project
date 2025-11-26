@@ -1,6 +1,6 @@
 $TTL 86400
 @   IN  SOA ns1.cyberlab.local. admin.cyberlab.local. (
-            2025112501
+            2025112603
             3600
             1800
             604800
@@ -16,6 +16,9 @@ ns1 IN  PTR ns1.cyberlab.local.
 25  IN  PTR suricata.cyberlab.local.
 40  IN  PTR openldap.cyberlab.local.
 41  IN  PTR phpldapadmin.cyberlab.local.
+50  IN  PTR prometheus-backend.cyberlab.local.
+60  IN  PTR grafana-backend.cyberlab.local.
+70  IN  PTR suricata.cyberlab.local.
 100 IN  PTR dns-server.cyberlab.local.
 250 IN  PTR openvpn.cyberlab.local.
 254 IN  PTR neuvector-allinone.cyberlab.local.

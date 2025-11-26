@@ -4,6 +4,14 @@
 
 http:
   middlewares:
+    # Forwarded headers middleware - properly handle X-Forwarded-* headers
+    forwarded-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+          X-Forwarded-Port: "443"
+          X-Forwarded-For: ""  # Traefik will populate this automatically
+
     # Security headers
     security-headers:
       headers:
@@ -69,8 +77,13 @@ http:
           - "10.10.10.100/32"     # Workstation on DMZ
           - "10.10.20.100/32"     # Workstation on Internal
           - "10.10.20.254/32"     # Neuvector Admin
+          - "10.10.30.5/32"       # Traefik (for internal routing)
           - "10.10.30.21/32"      # Wazuh Dashboard
+          - "10.10.30.50/32"      # Prometheus
+          - "10.10.30.60/32"      # Grafana
           - "10.10.30.100/32"     # Workstation on Security
+          - "10.10.40.5/32"       # Traefik (management network)
+          - "10.10.40.60/32"      # Grafana (management network)
           - "10.10.40.100/32"     # Workstation on Management
           - "127.0.0.1/32"        # Localhost (Docker)
 
@@ -232,6 +245,50 @@ http:
         - "compression"
         - "internal-net-access"
 
+    # =========================================================================
+    # MONITORING & OBSERVABILITY
+    # =========================================================================
+
+    # Prometheus - Metrics Collection (Admin Only)
+    prometheus:
+      rule: "Host(`prometheus.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "prometheus-svc"
+      tls: {}
+      middlewares:
+        - "forwarded-headers"
+        - "security-headers"
+        - "compression"
+        - "admin-only-access"
+
+    # Grafana Static Assets - No auth required (higher priority)
+    grafana-public:
+      rule: "Host(`grafana.cyberlab.local`) && (PathPrefix(`/public`) || PathPrefix(`/api/live`) || PathPrefix(`/assets`))"
+      entryPoints:
+        - "websecure"
+      service: "grafana-svc"
+      tls: {}
+      priority: 100
+      middlewares:
+        - "forwarded-headers"
+        - "security-headers"
+        - "compression"
+
+    # Grafana - Visualization & Dashboarding (Admin Only - lower priority)
+    grafana:
+      rule: "Host(`grafana.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "grafana-svc"
+      tls: {}
+      priority: 50
+      middlewares:
+        - "forwarded-headers"
+        - "security-headers"
+        - "compression"
+        - "admin-only-access"
+
     # NOTE: If you need Traefik to serve a specific certificate per-domain, consider
     # adding a file-provider router that references the backend service and uses a
     # TLS store with a configured defaultCertificate. The 'certificates' field
@@ -302,6 +359,20 @@ http:
       loadBalancer:
         servers:
           - url: "http://workstation:80"
+
+    # =========================================================================
+    # MONITORING & OBSERVABILITY SERVICES
+    # =========================================================================
+
+    prometheus-svc:
+      loadBalancer:
+        servers:
+          - url: "http://prometheus:9090"
+
+    grafana-svc:
+      loadBalancer:
+        servers:
+          - url: "http://grafana:3000"
 
   serversTransports:
       # Server transport for NeuVector and other HTTPS backends
