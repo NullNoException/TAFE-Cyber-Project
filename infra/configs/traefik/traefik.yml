@@ -47,6 +47,38 @@ entryPoints:
   wazuh-agents:
     address: ":1514"
 
+  # ==========================================================================
+  # HONEYPOT TCP ENTRY POINTS
+  # ==========================================================================
+
+  # Cowrie SSH Honeypot
+  cowrie-ssh:
+    address: ":2222"
+
+  # Cowrie Telnet Honeypot
+  cowrie-telnet:
+    address: ":2223"
+
+  # Dionaea FTP
+  dionaea-ftp:
+    address: ":21"
+
+  # Dionaea SMB/Samba
+  dionaea-smb:
+    address: ":445"
+
+  # Dionaea MSSQL
+  dionaea-mssql:
+    address: ":1433"
+
+  # Dionaea MySQL
+  dionaea-mysql:
+    address: ":3306"
+
+  # Dionaea RDP
+  dionaea-rdp:
+    address: ":3389"
+
 # Providers configuration
 providers:
   # Docker provider for container discovery

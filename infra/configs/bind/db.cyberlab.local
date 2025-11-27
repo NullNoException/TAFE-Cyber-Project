@@ -1,6 +1,6 @@
 $TTL 86400
 @   IN  SOA ns1.cyberlab.local. admin.cyberlab.local. (
-            2025112603  ; Serial
+            2025112604  ; Serial
             3600        ; Refresh (1 hour)
             1800        ; Retry (30 minutes)
             604800      ; Expire (1 week)
@@ -56,6 +56,14 @@ suricata            IN  A   10.10.30.70
 prometheus          IN  A   10.10.30.5
 grafana             IN  A   10.10.30.5
 node-exporter       IN  A   10.10.40.40
+
+; Honeypot Services (routed through Traefik)
+cowrie              IN  A   10.10.30.5
+cowrie.dashboard    IN  A   10.10.30.5
+dionaea             IN  A   10.10.30.5
+dionaea.dashboard   IN  A   10.10.30.5
+honeypot            IN  A   10.10.30.5
+honeypots           IN  A   10.10.30.5
 
 ; User Workstation
 workstation         IN  A   10.10.20.100

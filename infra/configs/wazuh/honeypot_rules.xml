@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Wazuh Honeypot Rules - Cowrie and Dionaea
+  Rules for detecting and alerting on honeypot activities with severity levels
+  Rule IDs: 100200-100299 (Honeypot category)
+-->
+
+<group name="honeypot">
+
+  <!-- =====================================================================
+       COWRIE SSH/TELNET HONEYPOT RULES
+       ====================================================================== -->
+
+  <!-- Rule 100201: SSH login attempt -->
+  <rule id="100201" level="5">
+    <if_sid>cowrie_login_failure</if_sid>
+    <description>Cowrie: Failed SSH login attempt</description>
+    <group>honeypot,ssh_attack,brute_force</group>
+    <mitre>
+      <id>T1110.001</id>  <!-- Brute Force: Password -->
+      <id>T1021.004</id>  <!-- Remote Services: SSH -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100202: Successful SSH login -->
+  <rule id="100202" level="7">
+    <if_sid>cowrie_login_success</if_sid>
+    <description>Cowrie: Successful SSH login detected</description>
+    <group>honeypot,ssh_attack,successful_login</group>
+    <mitre>
+      <id>T1021.004</id>  <!-- Remote Services: SSH -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100203: SSH login with root user -->
+  <rule id="100203" level="8">
+    <if_sid>cowrie_login</if_sid>
+    <match>username.*root</match>
+    <description>Cowrie: SSH login attempt using root account</description>
+    <group>honeypot,ssh_attack,privilege_escalation</group>
+    <mitre>
+      <id>T1110.001</id>  <!-- Brute Force: Password -->
+      <id>T1548.001</id>  <!-- Abuse Elevation Control Mechanism: setuid/setgid -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100204: SSH key exchange detected -->
+  <rule id="100204" level="5">
+    <if_sid>cowrie_ssh_key_exchange</if_sid>
+    <description>Cowrie: SSH key exchange detected</description>
+    <group>honeypot,ssh_activity</group>
+    <mitre>
+      <id>T1021.004</id>  <!-- Remote Services: SSH -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100205: Command execution in honeypot -->
+  <rule id="100205" level="6">
+    <if_sid>cowrie_command</if_sid>
+    <description>Cowrie: Command execution detected: $command</description>
+    <group>honeypot,command_execution</group>
+    <mitre>
+      <id>T1059</id>  <!-- Command and Scripting Interpreter -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100206: Suspicious commands detected -->
+  <rule id="100206" level="8">
+    <if_sid>cowrie_command</if_sid>
+    <match>wget|curl|nc|bash|sh|python|perl|ruby|exec</match>
+    <description>Cowrie: Suspicious command execution: $command</description>
+    <group>honeypot,malware,command_execution</group>
+    <mitre>
+      <id>T1059</id>  <!-- Command and Scripting Interpreter -->
+      <id>T1046</id>  <!-- Network Service Scanning -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100207: File download from honeypot -->
+  <rule id="100207" level="7">
+    <if_sid>cowrie_download</if_sid>
+    <description>Cowrie: File download detected - $filename (Hash: $file_hash)</description>
+    <group>honeypot,malware,file_download</group>
+    <mitre>
+      <id>T1105</id>  <!-- Ingress Tool Transfer -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100208: Multiple failed login attempts from same IP -->
+  <rule id="100208" level="9">
+    <if_sid>cowrie_login_failure</if_sid>
+    <frequency>5</frequency>
+    <timeframe>300</timeframe>
+    <same_source_ip></same_source_ip>
+    <description>Cowrie: Multiple SSH login attempts detected from $src_ip</description>
+    <group>honeypot,brute_force_attack</group>
+    <mitre>
+      <id>T1110.001</id>  <!-- Brute Force: Password -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100209: SSH Telnet connection -->
+  <rule id="100209" level="5">
+    <decoded_as>cowrie_login</decoded_as>
+    <description>Cowrie: Telnet login attempt detected</description>
+    <group>honeypot,telnet_attack,legacy_protocol</group>
+    <mitre>
+      <id>T1021.006</id>  <!-- Remote Services: Telnet -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100210: Session closure after long duration -->
+  <rule id="100210" level="7">
+    <if_sid>cowrie_connection_close</if_sid>
+    <description>Cowrie: Session closed after $duration seconds</description>
+    <group>honeypot,session_monitoring</group>
+    <mitre>
+      <id>T1021.004</id>  <!-- Remote Services: SSH -->
+    </mitre>
+  </rule>
+
+  <!-- =====================================================================
+       DIONAEA MULTI-PROTOCOL HONEYPOT RULES
+       ====================================================================== -->
+
+  <!-- Rule 100220: SMB connection attempt -->
+  <rule id="100220" level="5">
+    <if_sid>dionaea_smb_connection</if_sid>
+    <description>Dionaea: SMB connection attempt from $src_ip</description>
+    <group>honeypot,smb_attack,windows_exploit</group>
+    <mitre>
+      <id>T1021.002</id>  <!-- Remote Services: SMB/Windows Admin Shares -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100221: HTTP request to honeypot -->
+  <rule id="100221" level="5">
+    <if_sid>dionaea_http_request</if_sid>
+    <description>Dionaea: HTTP $method request from $src_ip to $uri</description>
+    <group>honeypot,http_request,web_attack</group>
+    <mitre>
+      <id>T1190</id>  <!-- Exploit Public-Facing Application -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100222: FTP login attempt -->
+  <rule id="100222" level="5">
+    <if_sid>dionaea_ftp_login</if_sid>
+    <description>Dionaea: FTP login attempt - User: $username from $src_ip</description>
+    <group>honeypot,ftp_attack,authentication</group>
+    <mitre>
+      <id>T1021.001</id>  <!-- Remote Services: FTP -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100223: SQL injection attack -->
+  <rule id="100223" level="8">
+    <if_sid>dionaea_sql_injection</if_sid>
+    <description>Dionaea: SQL injection attempt detected from $src_ip</description>
+    <group>honeypot,sql_injection,database_attack</group>
+    <mitre>
+      <id>T1190</id>  <!-- Exploit Public-Facing Application -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100224: Malware/Suspicious file detected -->
+  <rule id="100224" level="10">
+    <if_sid>dionaea_malware</if_sid>
+    <description>Dionaea: Malware suspected - $file_type (Hash: $file_hash) - Threat Level: $threat_level</description>
+    <group>honeypot,malware,file_analysis</group>
+    <mitre>
+      <id>T1105</id>  <!-- Ingress Tool Transfer -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100225: Brute force attack detected -->
+  <rule id="100225" level="9">
+    <if_sid>dionaea_brute_force</if_sid>
+    <description>Dionaea: Brute force attack detected - Protocol: $protocol, $attempts attempts from $src_ip</description>
+    <group>honeypot,brute_force_attack,credential_access</group>
+    <mitre>
+      <id>T1110</id>  <!-- Brute Force -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100226: MSSQL login attempt -->
+  <rule id="100226" level="6">
+    <if_sid>dionaea_mssql_login</if_sid>
+    <description>Dionaea: MSSQL login attempt - User: $username from $src_ip</description>
+    <group>honeypot,mssql_attack,database_attack</group>
+    <mitre>
+      <id>T1133</id>  <!-- External Remote Services -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100227: MySQL login attempt -->
+  <rule id="100227" level="6">
+    <if_sid>dionaea_mysql_login</if_sid>
+    <description>Dionaea: MySQL login attempt - User: $username from $src_ip</description>
+    <group>honeypot,mysql_attack,database_attack</group>
+    <mitre>
+      <id>T1021.003</id>  <!-- Remote Services: NFS/SMB -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100228: RDP connection attempt -->
+  <rule id="100228" level="5">
+    <if_sid>dionaea_rdp_connection</if_sid>
+    <description>Dionaea: RDP connection attempt - User: $username from $src_ip</description>
+    <group>honeypot,rdp_attack,remote_access</group>
+    <mitre>
+      <id>T1021.001</id>  <!-- Remote Services: RDP -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100229: Multiple HTTP requests with suspicious patterns -->
+  <rule id="100229" level="7">
+    <if_sid>dionaea_http_request</if_sid>
+    <match>\.\.\/|admin|shell|cmd|exec|system</match>
+    <description>Dionaea: Suspicious HTTP request pattern detected from $src_ip - URI: $uri</description>
+    <group>honeypot,web_attack,exploitation</group>
+    <mitre>
+      <id>T1190</id>  <!-- Exploit Public-Facing Application -->
+      <id>T1059</id>  <!-- Command and Scripting Interpreter -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100230: Rapid connection attempts from same source -->
+  <rule id="100230" level="9">
+    <if_sid>dionaea_connection</if_sid>
+    <frequency>10</frequency>
+    <timeframe>60</timeframe>
+    <same_source_ip></same_source_ip>
+    <description>Dionaea: Rapid connection attempts detected from $src_ip (Port scanning/Enumeration)</description>
+    <group>honeypot,port_scan,reconnaissance</group>
+    <mitre>
+      <id>T1046</id>  <!-- Network Service Scanning -->
+    </mitre>
+  </rule>
+
+  <!-- =====================================================================
+       GENERAL HONEYPOT RULES
+       ====================================================================== -->
+
+  <!-- Rule 100250: Honeypot alert aggregation -->
+  <rule id="100250" level="7">
+    <if_sid>100201,100202,100203,100204,100205,100207,100220,100221,100222,100226,100227,100228</if_sid>
+    <frequency>5</frequency>
+    <timeframe>600</timeframe>
+    <description>Honeypot: Multiple attack activities detected in the last 10 minutes</description>
+    <group>honeypot,attack_aggregation</group>
+    <mitre>
+      <id>T1592</id>  <!-- Gather Victim Host Information -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100251: Critical honeypot alert -->
+  <rule id="100251" level="10">
+    <if_sid>100208,100223,100224,100225</if_sid>
+    <description>Honeypot: Critical attack detected - Immediate investigation required</description>
+    <group>honeypot,critical_alert</group>
+    <mitre>
+      <id>T1046</id>  <!-- Network Service Scanning -->
+      <id>T1190</id>  <!-- Exploit Public-Facing Application -->
+    </mitre>
+  </rule>
+
+  <!-- Rule 100252: Repeated attacks from blacklisted IPs -->
+  <rule id="100252" level="10">
+    <if_sid>100201,100202,100220,100221,100222,100226,100227,100228</if_sid>
+    <frequency>50</frequency>
+    <timeframe>3600</timeframe>
+    <same_source_ip></same_source_ip>
+    <description>Honeypot: Repeated attack attempts from persistent threat actor at $src_ip</description>
+    <group>honeypot,threat_persistence,repeat_offender</group>
+    <mitre>
+      <id>T1595</id>  <!-- Active Scanning -->
+    </mitre>
+  </rule>
+
+</group>

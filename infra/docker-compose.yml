@@ -87,6 +87,11 @@ services:
       - CLUSTER_JOIN_ADDR=neuvector-controller
       - NV_PLATFORM_INFO=platform=Docker
       - NV_LOG_LEVEL=info
+      - NV_DISABLE_KUBECTL=true
+      - NV_DISABLE_DOCKER_SOCKET_CGROUP_MONITOR=true
+      - NV_CONTAINERS_REMAP=false
+      - NV_USE_ENFORCER=true
+      - NV_ADAPTER_DOCKER_ENABLED=true
       - TZ=UTC
     ports:
       - "10443:10443"
@@ -208,6 +213,8 @@ services:
       - CLUSTER_JOIN_ADDR=neuvector-controller
       - NV_PLATFORM_INFO=platform=Docker
       - NV_LOG_LEVEL=info
+      - NV_DISABLE_DOCKER_SOCKET_CGROUP_MONITOR=true
+      - NV_CONTAINERS_REMAP=false
       - TZ=UTC
     ports:
       - "18400:18400"
@@ -957,17 +964,13 @@ services:
     hostname: cowrie
     networks:
       internal_net:
-        ipv4_address: 10.10.20.70
+        ipv4_address: 10.10.20.72
       security_net:
-        ipv4_address: 10.10.30.70
+        ipv4_address: 10.10.30.72
     environment:
       - TZ=UTC
       - COWRIE_HOSTNAME=prodserver01
-    ports:
-      # SSH honeypot (redirected from standard SSH to avoid conflicts)
-      - "10.10.20.70:2222:2222"
-      # Telnet honeypot
-      - "10.10.20.70:2223:2223"
+    ports: []
     volumes:
       # Configuration
       - ./configs/honeypot/cowrie.cfg:/cowrie/etc/cowrie.cfg:ro
@@ -1013,23 +1016,7 @@ services:
     environment:
       - TZ=UTC
       - DIONAEA_NAME=dionaea-01
-    ports:
-      # SMB/Samba
-      - "10.10.20.71:445:445"
-      # FTP
-      - "10.10.20.71:21:21"
-      # HTTP
-      - "10.10.20.71:80:80"
-      # HTTPS
-      - "10.10.20.71:443:443"
-      # TFTP
-      - "10.10.20.71:69:69/udp"
-      # MSSQL
-      - "10.10.20.71:1433:1433"
-      # MySQL
-      - "10.10.20.71:3306:3306"
-      # RDP
-      - "10.10.20.71:3389:3389"
+    ports: []
     volumes:
       # Configuration
       - ./configs/honeypot/dionaea.cfg:/etc/dionaea/dionaea.cfg:ro
@@ -1045,7 +1032,7 @@ services:
         syslog-address: "udp://10.10.30.20:514"
         tag: "dionaea"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80", "||", "exit", "1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080", "||", "exit", "1"]
       interval: 30s
       timeout: 10s
       retries: 3

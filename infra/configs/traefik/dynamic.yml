@@ -289,6 +289,34 @@ http:
         - "compression"
         - "admin-only-access"
 
+    # =========================================================================
+    # HONEYPOT SERVICES - INTERNAL NETWORK ONLY
+    # =========================================================================
+
+    # Cowrie SSH/Telnet Honeypot Dashboard
+    cowrie-dashboard:
+      rule: "Host(`cowrie.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "cowrie-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+        - "security-net-access"
+
+    # Dionaea Multi-Protocol Honeypot Dashboard
+    dionaea-dashboard:
+      rule: "Host(`dionaea.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "dionaea-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+        - "security-net-access"
+
     # NOTE: If you need Traefik to serve a specific certificate per-domain, consider
     # adding a file-provider router that references the backend service and uses a
     # TLS store with a configured defaultCertificate. The 'certificates' field
@@ -374,6 +402,20 @@ http:
         servers:
           - url: "http://grafana:3000"
 
+    # =========================================================================
+    # HONEYPOT SERVICES - LOAD BALANCERS
+    # =========================================================================
+
+    cowrie-svc:
+      loadBalancer:
+        servers:
+          - url: "http://cowrie:8000"
+
+    dionaea-svc:
+      loadBalancer:
+        servers:
+          - url: "http://dionaea:80"
+
   serversTransports:
       # Server transport for NeuVector and other HTTPS backends
       neuvector-transport:
@@ -422,3 +464,94 @@ tls:
 
     intermediate:
       minVersion: "VersionTLS11"
+
+# =============================================================================
+# TCP ROUTERS - Non-HTTP Protocol Routing for Honeypots
+# =============================================================================
+
+tcp:
+  routers:
+    # Cowrie SSH Honeypot
+    cowrie-ssh:
+      entryPoints:
+        - "cowrie-ssh"
+      rule: "HostSNI(`*`)"
+      service: "cowrie-ssh-svc"
+
+    # Cowrie Telnet Honeypot
+    cowrie-telnet:
+      entryPoints:
+        - "cowrie-telnet"
+      rule: "HostSNI(`*`)"
+      service: "cowrie-telnet-svc"
+
+    # Dionaea FTP
+    dionaea-ftp:
+      entryPoints:
+        - "dionaea-ftp"
+      rule: "HostSNI(`*`)"
+      service: "dionaea-ftp-svc"
+
+    # Dionaea SMB/Samba
+    dionaea-smb:
+      entryPoints:
+        - "dionaea-smb"
+      rule: "HostSNI(`*`)"
+      service: "dionaea-smb-svc"
+
+    # Dionaea MSSQL
+    dionaea-mssql:
+      entryPoints:
+        - "dionaea-mssql"
+      rule: "HostSNI(`*`)"
+      service: "dionaea-mssql-svc"
+
+    # Dionaea MySQL
+    dionaea-mysql:
+      entryPoints:
+        - "dionaea-mysql"
+      rule: "HostSNI(`*`)"
+      service: "dionaea-mysql-svc"
+
+    # Dionaea RDP
+    dionaea-rdp:
+      entryPoints:
+        - "dionaea-rdp"
+      rule: "HostSNI(`*`)"
+      service: "dionaea-rdp-svc"
+
+  services:
+    cowrie-ssh-svc:
+      loadBalancer:
+        servers:
+          - address: "cowrie:2222"
+
+    cowrie-telnet-svc:
+      loadBalancer:
+        servers:
+          - address: "cowrie:2223"
+
+    dionaea-ftp-svc:
+      loadBalancer:
+        servers:
+          - address: "dionaea:21"
+
+    dionaea-smb-svc:
+      loadBalancer:
+        servers:
+          - address: "dionaea:445"
+
+    dionaea-mssql-svc:
+      loadBalancer:
+        servers:
+          - address: "dionaea:1433"
+
+    dionaea-mysql-svc:
+      loadBalancer:
+        servers:
+          - address: "dionaea:3306"
+
+    dionaea-rdp-svc:
+      loadBalancer:
+        servers:
+          - address: "dionaea:3389"
