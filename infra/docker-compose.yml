@@ -94,10 +94,10 @@ services:
         ipv4_address: 10.10.40.254
     environment:
       - NV_PLATFORM_INFO=platform=Docker
-      - NV_LOG_LEVEL=debug
-      - NV_REST_URL=https://127.0.0.1:8443
-      - CLUSTER_IP_INTERNAL=127.0.0.1
-      - CLUSTER_IP_EXTERNAL=127.0.0.1
+      - NV_LOG_LEVEL=info
+      - NV_REST_URL=https://neuvector-allinone:8443
+      - CLUSTER_IP_INTERNAL=neuvector-allinone
+      - CLUSTER_IP_EXTERNAL=10.10.0.10
       - TZ=UTC
     ports:
       - "8443:8443"
@@ -115,6 +115,11 @@ services:
       - /sys/fs/cgroup:/host/cgroup:ro
       - /var/neuvector:/var/neuvector
       - neuvector_logs:/var/log/neuvector
+      - ./configs/neuvector/certs/internal/ca.cert:/etc/neuvector/certs/internal/ca.cert:ro
+      - ./configs/neuvector/certs/internal/ca.key:/etc/neuvector/certs/internal/ca.key:ro
+      - ./configs/neuvector/certs/internal/cert.pem:/etc/neuvector/certs/internal/cert.pem:ro
+      - ./configs/neuvector/certs/internal/key.pem:/etc/neuvector/certs/internal/key.pem:ro
+      - ./configs/neuvector/certs/internal/cert.key:/etc/neuvector/certs/internal/cert.key:ro
     logging:
       driver: syslog
       options:
@@ -129,6 +134,12 @@ services:
           cpus: "1.0"
           memory: 2G
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "https://localhost:8443/api/v1/system/health", "--no-check-certificate"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   # ---------------------------------------------------------------------------
   # OpenVPN - VPN Gateway
@@ -781,8 +792,8 @@ services:
     environment:
       - TZ=UTC
       - SURICATA_HOME=/var/lib/suricata
-    # Suricata IDS mode with eve-log output for Wazuh integration
-    command: -c /etc/suricata/suricata.yaml -i eth1
+    # Suricata IDS mode monitoring all interfaces from suricata.yaml (eth0, eth1)
+    command: -c /etc/suricata/suricata.yaml --af-packet
     logging:
       driver: syslog
       options:

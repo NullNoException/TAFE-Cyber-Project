@@ -142,10 +142,19 @@ app-layer:
     mqtt:
       enabled: yes
 
-# Network interface configuration for packet capture
+# Network interface configuration for packet capture - Monitor all interfaces
 af-packet:
+  - interface: eth0
+    cluster-id: 100
+    cluster-type: cluster_flow
+    defrag: yes
+    use-mmap: yes
+    mmap-locked: no
+    tpacket-v3: yes
+    use-emergency-flush: yes
+    buffer-size: 32768
   - interface: eth1
-    cluster-id: 99
+    cluster-id: 101
     cluster-type: cluster_flow
     defrag: yes
     use-mmap: yes
