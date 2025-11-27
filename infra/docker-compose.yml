@@ -238,6 +238,42 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
+  # NeuVector Scanner - Vulnerability Scanning (CVE Analysis)
+  # ---------------------------------------------------------------------------
+  neuvector-scanner:
+    image: neuvector/scanner:latest
+    container_name: neuvector.scanner
+    hostname: neuvector-scanner
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.32
+    environment:
+      - CLUSTER_JOIN_ADDR=neuvector-controller
+      - NV_PLATFORM_INFO=platform=Docker
+      - NV_LOG_LEVEL=info
+      - TZ=UTC
+    ports:
+      - "18402:18402"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "neuvector-scanner"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    depends_on:
+      - neuvector-controller
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
   # OpenVPN - VPN Gateway
   # ---------------------------------------------------------------------------
   openvpn:
