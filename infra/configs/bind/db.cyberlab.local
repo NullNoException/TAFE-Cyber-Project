@@ -18,8 +18,8 @@ web                 IN  A   10.10.10.10
 www                 IN  A   10.10.10.10
 
 ; Security Services
-neuvector           IN  A   10.10.10.5
-security            IN  A   10.10.10.5
+neuvector           IN  A   10.10.40.11
+security            IN  A   10.10.40.11
 ids                 IN  A   10.10.30.25
 
 ; Wazuh Services - User-facing (through Traefik)

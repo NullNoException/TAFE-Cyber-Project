@@ -76,7 +76,6 @@ http:
         sourceRange:
           - "10.10.10.100/32"     # Workstation on DMZ
           - "10.10.20.100/32"     # Workstation on Internal
-          - "10.10.20.254/32"     # Neuvector Admin
           - "10.10.30.5/32"       # Traefik (for internal routing)
           - "10.10.30.21/32"      # Wazuh Dashboard
           - "10.10.30.50/32"      # Prometheus
@@ -99,18 +98,6 @@ http:
           - "127.0.0.1/32"      # Localhost (Docker)
 
   routers:
-    # NeuVector Console - Direct proxy to NeuVector on DMZ IP
-    neuvector:
-      rule: "Host(`neuvector.cyberlab.local`) || Host(`security.cyberlab.local`)"
-      entryPoints:
-        - "websecure"
-      service: "neuvector"
-      tls: {}
-      middlewares:
-        - "security-headers"
-        - "compression"
-        - "admin-only-access"
-
     # Nginx Web Server - Public Services (DMZ/Internal)
     nginx:
       rule: "Host(`web.cyberlab.local`) || Host(`www.cyberlab.local`)"
@@ -231,7 +218,7 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
-        - "internal-net-access"
+        # - "internal-net-access"
 
     # Workstation Desktop - Internal Network + Management Network
     workstation:
@@ -334,12 +321,6 @@ http:
         - "internal-net-access"
 
   services:
-    neuvector:
-      loadBalancer:
-        servers:
-          - url: "https://neuvector.allinone:8443"
-        serversTransport: "neuvector-transport"
-
     nginx:
       loadBalancer:
         servers:
@@ -427,10 +408,6 @@ http:
           - url: "http://webgoat:8080"
 
   serversTransports:
-      # Server transport for NeuVector and other HTTPS backends
-      neuvector-transport:
-        serverName: "neuvector.allinone"
-        insecureSkipVerify: true  # Lab environment: NeuVector uses self-signed certs
       # Server transport for OpenVPN Access Server
       openvpn-transport:
         serverName: "openvpn"

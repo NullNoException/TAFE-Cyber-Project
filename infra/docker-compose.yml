@@ -64,138 +64,14 @@ services:
   # ===========================================================================
 
   # ---------------------------------------------------------------------------
-  # NeuVector Controller - Container Security Platform (Core)
+  # NeuVector All-in-One - Container Security Platform
   # ---------------------------------------------------------------------------
-  neuvector-controller:
-    image: neuvector/controller:5.4.7
-    container_name: neuvector.controller
-    hostname: neuvector-controller
+  neuvector-allinone:
+    image: neuvector/allinone:5.4.7
+    container_name: neuvector-allinone
+    hostname: neuvector-allinone
     privileged: true
-    cap_add:
-      - SYS_ADMIN
-      - NET_ADMIN
-      - SYS_PTRACE
-      - IPC_LOCK
-    security_opt:
-      - apparmor=unconfined
-      - seccomp=unconfined
-      - label=disable
-    networks:
-      security_net:
-        ipv4_address: 10.10.30.11
-    environment:
-      - CLUSTER_JOIN_ADDR=neuvector-controller
-      - NV_PLATFORM_INFO=platform=Docker
-      - NV_LOG_LEVEL=info
-      - NV_DISABLE_KUBECTL=true
-      - NV_DISABLE_DOCKER_SOCKET_CGROUP_MONITOR=true
-      - NV_CONTAINERS_REMAP=false
-      - NV_USE_ENFORCER=true
-      - NV_ADAPTER_DOCKER_ENABLED=true
-      - TZ=UTC
-    ports:
-      - "10443:10443"
-      - "18300:18300"
-      - "18301:18301"
-      - "18301:18301/udp"
-    volumes:
-      - /lib/modules:/lib/modules:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /proc:/host/proc:ro
-      - /sys/fs/cgroup:/host/cgroup:ro
-      - neuvector_controller_data:/var/neuvector
-      - neuvector_logs:/var/log/neuvector
-      - ./configs/neuvector/certs/internal:/etc/neuvector/certs/internal:rw
-    logging:
-      driver: syslog
-      options:
-        syslog-address: "udp://10.10.30.20:514"
-        tag: "neuvector-controller"
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 2G
-        reservations:
-          cpus: "0.5"
-          memory: 1G
-    restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--spider",
-          "-q",
-          "https://localhost:10443/v1/cluster",
-          "--no-check-certificate",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
-  # ---------------------------------------------------------------------------
-  # NeuVector Manager - Container Security Platform (Web UI & API)
-  # ---------------------------------------------------------------------------
-  neuvector-manager:
-    image: neuvector/manager:5.4.7
-    container_name: neuvector.manager
-    hostname: neuvector-manager
-    networks:
-      security_net:
-        ipv4_address: 10.10.30.22
-      management_net:
-        ipv4_address: 10.10.40.22
-    environment:
-      - CTRL_SERVER_IP=neuvector-controller
-      - NV_LOG_LEVEL=info
-      - TZ=UTC
-    ports:
-      - "8443:8443"
-      - "11443:11443"
-    volumes:
-      - ./configs/neuvector/certs/internal:/etc/neuvector/certs/internal:rw
-    logging:
-      driver: syslog
-      options:
-        syslog-address: "udp://10.10.30.20:514"
-        tag: "neuvector-manager"
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 2G
-        reservations:
-          cpus: "0.5"
-          memory: 1G
-    depends_on:
-      - neuvector-controller
-    restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--spider",
-          "-q",
-          "https://localhost:8443/api/v1/system/health",
-          "--no-check-certificate",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
-  # ---------------------------------------------------------------------------
-  # NeuVector Enforcer - Container Security Platform (Monitoring Agent)
-  # ---------------------------------------------------------------------------
-  neuvector-enforcer:
-    image: neuvector/enforcer:5.4.7
-    container_name: neuvector.enforcer
-    hostname: neuvector-enforcer
     pid: host
-    privileged: true
     cap_add:
       - SYS_ADMIN
       - NET_ADMIN
@@ -208,15 +84,21 @@ services:
       - label=disable
     networks:
       security_net:
-        ipv4_address: 10.10.30.31
+        ipv4_address: 10.10.30.11
+      management_net:
+        ipv4_address: 10.10.40.11
     environment:
-      - CLUSTER_JOIN_ADDR=neuvector-controller
+      - CLUSTER_JOIN_ADDR=10.10.30.11
+      - CTRL_SERVER_IP=127.0.0.1
       - NV_PLATFORM_INFO=platform=Docker
       - NV_LOG_LEVEL=info
-      - NV_DISABLE_DOCKER_SOCKET_CGROUP_MONITOR=true
-      - NV_CONTAINERS_REMAP=false
+      - NV_INTERNAL_CERT_VERIFY=false
       - TZ=UTC
     ports:
+      - "8443:8443"
+      - "10443:10443"
+      - "18300:18300"
+      - "18301:18301"
       - "18400:18400"
       - "18401:18401"
     volumes:
@@ -224,60 +106,21 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc:/host/proc:ro
       - /sys/fs/cgroup:/host/cgroup:ro
-      - neuvector_enforcer_data:/var/neuvector
-      - neuvector_logs:/var/log/neuvector
-      - ./configs/neuvector/certs/internal:/etc/neuvector/certs/internal:rw
+      - neuvector_data:/var/neuvector
+      - ./configs/neuvector/certs/internal:/etc/neuvector/certs/internal
     logging:
       driver: syslog
       options:
         syslog-address: "udp://10.10.30.20:514"
-        tag: "neuvector-enforcer"
+        tag: "neuvector"
     deploy:
       resources:
         limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
           cpus: "1.0"
           memory: 2G
-        reservations:
-          cpus: "0.5"
-          memory: 1G
-    depends_on:
-      - neuvector-controller
-    restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
-  # NeuVector Scanner - Vulnerability Scanning (CVE Analysis)
-  # ---------------------------------------------------------------------------
-  neuvector-scanner:
-    image: neuvector/scanner:latest
-    container_name: neuvector.scanner
-    hostname: neuvector-scanner
-    networks:
-      security_net:
-        ipv4_address: 10.10.30.32
-    environment:
-      - CLUSTER_JOIN_ADDR=neuvector-controller
-      - NV_PLATFORM_INFO=platform=Docker
-      - NV_LOG_LEVEL=info
-      - TZ=UTC
-    ports:
-      - "18402:18402"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    logging:
-      driver: syslog
-      options:
-        syslog-address: "udp://10.10.30.20:514"
-        tag: "neuvector-scanner"
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 2G
-        reservations:
-          cpus: "0.5"
-          memory: 1G
-    depends_on:
-      - neuvector-controller
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
@@ -319,7 +162,7 @@ services:
           memory: 512M
     restart: unless-stopped
     depends_on:
-      - neuvector-controller
+      - neuvector-allinone
     # Traefik routing configured in configs/traefik/dynamic.yml
 
   # ===========================================================================
@@ -463,7 +306,7 @@ services:
           cpus: "0.5"
           memory: 512M
     depends_on:
-      - neuvector-manager
+      - neuvector-allinone
       - dns-server
     restart: unless-stopped
     # Traefik Dashboard routed via dynamic.yml (admin-only-access middleware)
@@ -501,7 +344,7 @@ services:
     depends_on:
       - traefik
       - wazuh.manager
-      - neuvector-manager
+      - neuvector-allinone
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
@@ -659,7 +502,7 @@ services:
   # Note: Uses MongoDB for document storage (ARM64 compatible)
   # ---------------------------------------------------------------------------
   rocketchat:
-    image: rocketchat/rocket.chat:latest
+    image: rocketchat/rocket.chat:7.5.0
     container_name: rocketchat
     hostname: rocketchat
     networks:
@@ -668,10 +511,9 @@ services:
       security_net:
         ipv4_address: 10.10.30.52
     environment:
-      - MONGO_URL=mongodb://mongodb:27017/rocketchat
-      - MONGO_OPLOG_URL=mongodb://mongodb:27017/local
+      - MONGO_URL=mongodb://mongodb:27017/rocketchat?replicaSet=rs0
       - ROOT_URL=https://chat.cyberlab.local
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=info
       - TZ=UTC
     depends_on:
       - mongodb
@@ -1382,6 +1224,7 @@ volumes:
   suricata_logs:
   suricata_rules:
   neuvector_logs:
+  neuvector_data:
   neuvector_controller_data:
   neuvector_enforcer_data:
 
