@@ -1,6 +1,6 @@
 $TTL 86400
 @   IN  SOA ns1.cyberlab.local. admin.cyberlab.local. (
-            2025112604  ; Serial
+            2025112605  ; Serial
             3600        ; Refresh (1 hour)
             1800        ; Retry (30 minutes)
             604800      ; Expire (1 week)
@@ -57,13 +57,19 @@ prometheus          IN  A   10.10.30.5
 grafana             IN  A   10.10.30.5
 node-exporter       IN  A   10.10.40.40
 
-; Honeypot Services (routed through Traefik)
+; Honeypot Services (accessed via TCP routing through Traefik on specified ports)
+; cowrie: SSH (2222), Telnet (2223)
+; dionaea: FTP (21), SMB (445), MSSQL (1433), MySQL (3306), RDP (3389)
 cowrie              IN  A   10.10.30.5
-cowrie.dashboard    IN  A   10.10.30.5
 dionaea             IN  A   10.10.30.5
-dionaea.dashboard   IN  A   10.10.30.5
 honeypot            IN  A   10.10.30.5
 honeypots           IN  A   10.10.30.5
+
+; Web Application Honeypots (OWASP vulnerable apps - via HTTPS through Traefik)
+juice-shop          IN  A   10.10.30.5
+juice                IN  A   10.10.30.5
+webgoat             IN  A   10.10.30.5
+webapp-honeypots    IN  A   10.10.30.5
 
 ; User Workstation
 workstation         IN  A   10.10.20.100

@@ -844,6 +844,11 @@ services:
       - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.manager.pem:/etc/ssl/filebeat.pem
       - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.manager-key.pem:/etc/ssl/filebeat.key
       - ./configs/wazuh/wazuh_cluster/wazuh_manager.conf:/wazuh-config-mount/etc/ossec.conf
+      # Suricata integration - rules mounted to container
+      # Decoders disabled due to format incompatibility - using native Wazuh JSON parsing
+      - ./configs/wazuh/suricata_rules.xml:/var/ossec/etc/rules/suricata_rules.xml:ro
+      # Share Suricata logs volume for log monitoring
+      - suricata_logs:/var/log/suricata:ro
     logging:
       driver: syslog
       options:
@@ -984,7 +989,7 @@ services:
         syslog-address: "udp://10.10.30.20:514"
         tag: "cowrie"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:2222", "||", "exit", "1"]
+      test: ["CMD", "nc", "-zv", "localhost", "2222"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -1032,7 +1037,7 @@ services:
         syslog-address: "udp://10.10.30.20:514"
         tag: "dionaea"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080", "||", "exit", "1"]
+      test: ["CMD", "nc", "-zv", "localhost", "21"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -1048,6 +1053,129 @@ services:
     depends_on:
       - wazuh.manager
     restart: unless-stopped
+
+  # ===========================================================================
+  # WEB APPLICATION HONEYPOTS - OWASP VULNERABLE APPS
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # OWASP Juice Shop - Intentionally Vulnerable Web Application
+  # ---------------------------------------------------------------------------
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: juice-shop
+    hostname: juice-shop
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.80
+      security_net:
+        ipv4_address: 10.10.30.80
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TZ=UTC
+      - LOG_LEVEL=info
+    ports: []
+    volumes:
+      - juice_shop_data:/juice-shop/data
+      - juice_shop_logs:/juice-shop/logs
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "juice-shop"
+        syslog-facility: "16"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    depends_on:
+      - wazuh.manager
+      - traefik
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.juice-shop.rule=Host(`juice-shop.cyberlab.local`)"
+      - "traefik.http.routers.juice-shop.entrypoints=websecure"
+      - "traefik.http.routers.juice-shop.tls=true"
+      - "traefik.http.services.juice-shop-svc.loadbalancer.server.port=3000"
+
+  # ---------------------------------------------------------------------------
+  # OWASP WebGoat - Web Application Security Training
+  # ---------------------------------------------------------------------------
+  webgoat:
+    image: webgoat/goatandwolf:latest
+    container_name: webgoat
+    hostname: webgoat
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.81
+      security_net:
+        ipv4_address: 10.10.30.81
+    environment:
+      - PORT=8080
+      - TZ=UTC
+      - GOATANDWOLF_VERBOSE=true
+    ports: []
+    volumes:
+      - webgoat_data:/usr/local/tomcat/webapps/WebGoat/data
+      - webgoat_logs:/usr/local/tomcat/logs
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "webgoat"
+        syslog-facility: "16"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/WebGoat/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    depends_on:
+      - wazuh.manager
+      - traefik
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webgoat.rule=Host(`webgoat.cyberlab.local`)"
+      - "traefik.http.routers.webgoat.entrypoints=websecure"
+      - "traefik.http.routers.webgoat.tls=true"
+      - "traefik.http.services.webgoat-svc.loadbalancer.server.port=8080"
 
   # ===========================================================================
   # BACKUP SERVICE
@@ -1216,6 +1344,10 @@ volumes:
   # Honeypot Volumes
   cowrie_logs:
   dionaea_logs:
+  juice_shop_data:
+  juice_shop_logs:
+  webgoat_data:
+  webgoat_logs:
 
   # Wazuh Volumes
   wazuh_api_configuration:

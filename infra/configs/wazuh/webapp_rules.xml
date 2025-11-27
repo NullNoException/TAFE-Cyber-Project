@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Web Application Honeypot Detection Rules (IDs: 100300-100399)
+  Monitors Juice Shop and WebGoat for exploitation attempts
+-->
+
+<group name="webapp_honeypots">
+
+  <!-- =====================================================================
+       JUICE SHOP ATTACK DETECTION RULES (100300-100350)
+       ===================================================================== -->
+
+  <!-- Rule 100301: SQL Injection Detection -->
+  <rule id="100301" level="8">
+    <if_matched_group>juice_shop_sql_injection</if_matched_group>
+    <description>SQL Injection attack detected on Juice Shop</description>
+    <mitre>
+      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+      <id>T1595</id> <!-- Active Scanning -->
+    </mitre>
+    <group>webapp_attack, injection, database</group>
+  </rule>
+
+  <!-- Rule 100302: XSS Attack Detection -->
+  <rule id="100302" level="7">
+    <if_matched_group>juice_shop_xss_attack</if_matched_group>
+    <description>Cross-Site Scripting (XSS) attack detected on Juice Shop</description>
+    <mitre>
+      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+      <id>T1059</id> <!-- Command and Scripting Interpreter -->
+    </mitre>
+    <group>webapp_attack, xss, injection</group>
+  </rule>
+
+  <!-- Rule 100303: Path Traversal Attack -->
+  <rule id="100303" level="7">
+    <if_matched_group>juice_shop_path_traversal</if_matched_group>
+    <description>Path Traversal attack detected on Juice Shop</description>
+    <mitre>
+      <id>T1083</id> <!-- File and Directory Discovery -->
+      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+    </mitre>
+    <group>webapp_attack, path_traversal, file_access</group>
+  </rule>
+
+  <!-- Rule 100304: Authentication Bypass Attempt -->
+  <rule id="100304" level="8">
+    <if_matched_group>juice_shop_auth_bypass</if_matched_group>
+    <description>Authentication bypass or privilege escalation attempt on Juice Shop</description>
+    <mitre>
+      <id>T1110</id> <!-- Brute Force -->
+      <id>T1078</id> <!-- Valid Accounts -->
+    </mitre>
+    <group>webapp_attack, authentication, access_control</group>
+  </rule>
+
+  <!-- Rule 100305: Sensitive Data Exposure -->
+  <rule id="100305" level="9">
+    <if_matched_group>juice_shop_data_exposure</if_matched_group>
+    <description>Sensitive data exposure detected on Juice Shop (API keys, passwords, tokens)</description>
+    <mitre>
+      <id>T1526</id> <!-- Enumerate External Targets -->
+      <id>T1589</id> <!-- Gather Victim Identity Information -->
+    </mitre>
+    <group>webapp_attack, data_exposure, credential_exposure</group>
+  </rule>
+
+  <!-- Rule 100306: File Upload Attack -->
+  <rule id="100306" level="8">
+    <if_matched_group>juice_shop_file_upload</if_matched_group>
+    <description>Malicious file upload attempt detected on Juice Shop</description>
+    <mitre>
+      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+      <id>T1059</id> <!-- Command and Scripting Interpreter -->
+    </mitre>
+    <group>webapp_attack, file_upload, rce</group>
+  </rule>
+
+  <!-- Rule 100307: Broken Access Control -->
+  <rule id="100307" level="8">
+    <if_matched_group>juice_shop_access_control</if_matched_group>
+    <description>Broken Access Control (BACC) or privilege escalation attempt on Juice Shop</description>
+    <mitre>
+      <id>T1548</id> <!-- Abuse Elevation Control Mechanism -->
+      <id>T1078</id> <!-- Valid Accounts -->
+    </mitre>
+    <group>webapp_attack, access_control, privilege_escalation</group>
+  </rule>
+
+  <!-- Rule 100308: BOLA (Broken Object Level Authorization) -->
+  <rule id="100308" level="8">
+    <if_matched_group>juice_shop_bola</if_matched_group>
+    <description>BOLA or Direct Object Reference attempt on Juice Shop</description>
+    <mitre>
+      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+      <id>T1526</id> <!-- Enumerate External Targets -->
+    </mitre>
+    <group>webapp_attack, access_control, enumeration</group>
+  </rule>
+
+  <!-- Rule 100309: Brute Force Attack on Juice Shop -->
+  <rule id="100309" level="9">
+    <if_matched_group>juice_shop_brute_force</if_matched_group>
+    <frequency>5</frequency>
+    <timeframe>60</timeframe>
+    <description>Brute force attack detected on Juice Shop (multiple failed logins)</description>
+    <mitre>
+      <id>T1110</id> <!-- Brute Force -->
+      <id>T1110.001</id> <!-- Brute Force: Password Guessing -->
+    </mitre>
+    <group>webapp_attack, brute_force, authentication</group>
+  </rule>
+
+  <!-- Rule 100310: Juice Shop Attack Summary -->
+  <rule id="100310" level="10">
+    <if_matched_sid>100301|100302|100303|100304|100305|100306|100307|100308</if_matched_sid>
+    <frequency>2</frequency>
+    <timeframe>120</timeframe>
+    <description>Multiple attack vectors detected on Juice Shop (possible coordinated exploit)</description>
+    <mitre>
+      <id>T1587</id> <!-- Develop Capabilities -->
+      <id>T1566</id> <!-- Phishing -->
+    </mitre>
+    <group>webapp_attack, coordinated_attack, high_severity</group>
+  </rule>
+
+  <!-- =====================================================================
+       WEBGOAT ATTACK DETECTION RULES (100320-100350)
+       ===================================================================== -->
+
+  <!-- Rule 100320: WebGoat SQL Injection Lesson Activity -->
+  <rule id="100320" level="5">
+    <if_matched_group>webgoat_sql_lesson</if_matched_group>
+    <description>WebGoat SQL Injection lesson activity detected (training activity)</description>
+    <mitre>
+      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+    </mitre>
+    <group>webapp_training, sql_injection, learning</group>
+  </rule>
+
+  <!-- Rule 100321: WebGoat Authentication Lesson Activity -->
+  <rule id="100321" level="5">
+    <if_matched_group>webgoat_auth_lesson</if_matched_group>
+    <description>WebGoat Authentication lesson activity detected (training activity)</description>
+    <mitre>
+      <id>T1110</id> <!-- Brute Force -->
+    </mitre>
+    <group>webapp_training, authentication, learning</group>
+  </rule>
+
+  <!-- Rule 100322: WebGoat XXE Lesson Activity -->
+  <rule id="100322" level="5">
+    <if_matched_group>webgoat_xxe_lesson</if_matched_group>
+    <description>WebGoat XXE lesson activity detected (training activity)</description>
+    <mitre>
+      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+    </mitre>
+    <group>webapp_training, xxe, learning</group>
+  </rule>
+
+  <!-- Rule 100323: WebGoat CSRF Lesson Activity -->
+  <rule id="100323" level="5">
+    <if_matched_group>webgoat_csrf_lesson</if_matched_group>
+    <description>WebGoat CSRF lesson activity detected (training activity)</description>
+    <mitre>
+      <id>T1583</id> <!-- Acquire Infrastructure -->
+    </mitre>
+    <group>webapp_training, csrf, learning</group>
+  </rule>
+
+  <!-- Rule 100324: WebGoat RCE Lesson Activity -->
+  <rule id="100324" level="6">
+    <if_matched_group>webgoat_rce_lesson</if_matched_group>
+    <description>WebGoat RCE lesson activity detected (training activity - high risk)</description>
+    <mitre>
+      <id>T1059</id> <!-- Command and Scripting Interpreter -->
+    </mitre>
+    <group>webapp_training, rce, learning, high_severity</group>
+  </rule>
+
+  <!-- Rule 100325: WebGoat LDAP Lesson Activity -->
+  <rule id="100325" level="5">
+    <if_matched_group>webgoat_ldap_lesson</if_matched_group>
+    <description>WebGoat LDAP Injection lesson activity detected (training activity)</description>
+    <mitre>
+      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+    </mitre>
+    <group>webapp_training, ldap_injection, learning</group>
+  </rule>
+
+  <!-- Rule 100326: WebGoat Path Traversal Lesson Activity -->
+  <rule id="100326" level="5">
+    <if_matched_group>webgoat_path_lesson</if_matched_group>
+    <description>WebGoat Path Traversal lesson activity detected (training activity)</description>
+    <mitre>
+      <id>T1083</id> <!-- File and Directory Discovery -->
+    </mitre>
+    <group>webapp_training, path_traversal, learning</group>
+  </rule>
+
+  <!-- Rule 100327: WebGoat JWT Lesson Activity -->
+  <rule id="100327" level="5">
+    <if_matched_group>webgoat_jwt_lesson</if_matched_group>
+    <description>WebGoat JWT lesson activity detected (training activity)</description>
+    <mitre>
+      <id>T1550</id> <!-- Use Alternate Authentication Material -->
+    </mitre>
+    <group>webapp_training, jwt, learning</group>
+  </rule>
+
+  <!-- Rule 100328: WebGoat Sensitive Data Lesson Activity -->
+  <rule id="100328" level="5">
+    <if_matched_group>webgoat_sensitive_lesson</if_matched_group>
+    <description>WebGoat Sensitive Data Exposure lesson activity detected (training activity)</description>
+    <mitre>
+      <id>T1526</id> <!-- Enumerate External Targets -->
+    </mitre>
+    <group>webapp_training, data_exposure, learning</group>
+  </rule>
+
+  <!-- =====================================================================
+       GENERIC WEB APPLICATION ATTACK RULES (100350-100399)
+       ===================================================================== -->
+
+  <!-- Rule 100350: HTTP Error Rate Alert -->
+  <rule id="100350" level="6">
+    <if_matched_group>webapp_http_error</if_matched_group>
+    <frequency>10</frequency>
+    <timeframe>60</timeframe>
+    <description>High rate of HTTP errors detected on web honeypots (possible DDoS or scanning)</description>
+    <mitre>
+      <id>T1498</id> <!-- Network Denial of Service -->
+    </mitre>
+    <group>webapp_attack, dos, error_rate</group>
+  </rule>
+
+  <!-- Rule 100351: 404 Scanning Pattern -->
+  <rule id="100351" level="6">
+    <program_name>juice-shop|webgoat</program_name>
+    <prematch>404|not found</prematch>
+    <frequency>15</frequency>
+    <timeframe>60</timeframe>
+    <description>Directory/path scanning activity detected on web honeypot</description>
+    <mitre>
+      <id>T1595</id> <!-- Active Scanning -->
+      <id>T1526</id> <!-- Enumerate External Targets -->
+    </mitre>
+    <group>webapp_attack, scanning, enumeration</group>
+  </rule>
+
+  <!-- Rule 100352: SQLi Pattern in Web Honeypot -->
+  <rule id="100352" level="8">
+    <program_name>juice-shop|webgoat</program_name>
+    <prematch>union.*select|select.*from|drop.*table|exec\(|script.*alert</prematch>
+    <description>SQL Injection or XSS pattern detected in web honeypot traffic</description>
+    <mitre>
+      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+    </mitre>
+    <group>webapp_attack, injection</group>
+  </rule>
+
+  <!-- Rule 100353: Admin Access Attempt -->
+  <rule id="100353" level="7">
+    <program_name>juice-shop|webgoat</program_name>
+    <prematch>/admin|/administrator|admin.php|admin.jsp|/wp-admin</prematch>
+    <description>Admin panel or privileged path access attempt on web honeypot</description>
+    <mitre>
+      <id>T1078</id> <!-- Valid Accounts -->
+    </mitre>
+    <group>webapp_attack, privilege_escalation, access_control</group>
+  </rule>
+
+  <!-- Rule 100354: Shell/Webshell Upload Attempt -->
+  <rule id="100354" level="9">
+    <program_name>juice-shop|webgoat</program_name>
+    <prematch>shell.php|shell.jsp|webshell|backdoor|.exe|.bat|cmd.exe</prematch>
+    <description>Webshell or executable upload attempt detected on web honeypot</description>
+    <mitre>
+      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+      <id>T1651</id> <!-- Exploit for Privilege Escalation -->
+    </mitre>
+    <group>webapp_attack, rce, shell_upload</group>
+  </rule>
+
+  <!-- Rule 100355: API Enumeration Activity -->
+  <rule id="100355" level="6">
+    <program_name>juice-shop|webgoat</program_name>
+    <prematch>/api/|/rest/</prematch>
+    <frequency>20</frequency>
+    <timeframe>60</timeframe>
+    <description>API endpoint enumeration detected on web honeypot</description>
+    <mitre>
+      <id>T1595</id> <!-- Active Scanning -->
+      <id>T1526</id> <!-- Enumerate External Targets -->
+    </mitre>
+    <group>webapp_attack, api_enumeration</group>
+  </rule>
+
+  <!-- Rule 100360: Critical Web Honeypot Attack -->
+  <rule id="100360" level="10">
+    <if_matched_sid>100352|100354</if_matched_sid>
+    <description>CRITICAL: Code injection or shell upload attempt detected on web honeypot</description>
+    <mitre>
+      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+      <id>T1059</id> <!-- Command and Scripting Interpreter -->
+    </mitre>
+    <group>webapp_attack, critical, rce</group>
+  </rule>
+
+  <!-- Rule 100361: Web Honeypot Daily Summary -->
+  <rule id="100361" level="4">
+    <if_matched_group>webapp_attack|webapp_training</if_matched_group>
+    <frequency>50</frequency>
+    <timeframe>86400</timeframe>
+    <description>Daily web honeypot activity summary (attacks/training detected)</description>
+    <group>webapp_summary, statistics</group>
+  </rule>
+
+</group>

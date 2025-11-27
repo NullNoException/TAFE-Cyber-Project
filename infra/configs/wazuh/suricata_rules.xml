@@ -1,0 +1,287 @@
+<group name="suricata,ids,network_detection">
+
+  <!-- =================================================================== -->
+  <!-- SURICATA IDS/IPS ALERT RULES FOR WAZUH SIEM -->
+  <!-- =================================================================== -->
+  <!-- These rules process Suricata EVE JSON alerts and trigger Wazuh      -->
+  <!-- alerts with appropriate severity levels and MITRE ATT&CK mapping    -->
+  <!-- Rule ID Range: 300000-300099 (Suricata IDS Detection)              -->
+  <!-- =================================================================== -->
+
+  <!-- Generic Suricata Alert Processing -->
+  <rule id="300000" level="3">
+    <program_name>suricata</program_name>
+    <description>Suricata: Network traffic event detected</description>
+  </rule>
+
+  <!-- SSH Brute Force - High Priority -->
+  <rule id="300001" level="8">
+    <program_name>suricata</program_name>
+    <field name="alert.signature">.*SSH.*Brute.*Force.*</field>
+    <description>Suricata: SSH brute force attack detected</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+  </rule>
+
+  <!-- Port Scanning Detection -->
+  <rule id="300002" level="7">
+    <program_name>suricata</program_name>
+    <field name="alert.signature">.*Port.*Scan.*</field>
+    <description>Suricata: Port scanning reconnaissance activity detected</description>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+  </rule>
+
+  <!-- SQL Injection Attack -->
+  <rule id="300003" level="9">
+    <program_name>suricata</program_name>
+    <field name="alert.signature">.*SQL.*Injection.*</field>
+    <description>Suricata: SQL injection attack detected</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- Cross-Site Scripting (XSS) Attack -->
+  <rule id="300004" level="8">
+    <program_name>suricata</program_name>
+    <field name="alert.signature">.*XSS.*|.*Cross.*Site.*Script.*</field>
+    <description>Suricata: Cross-site scripting attack detected</description>
+    <mitre>
+      <id>T1598</id>
+    </mitre>
+  </rule>
+
+  <!-- Command Injection Attack -->
+  <rule id="300005" level="9">
+    <program_name>suricata</program_name>
+    <field name="alert.signature">.*Command.*Injection.*</field>
+    <description>Suricata: OS command injection attack detected</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- Path Traversal/LFI/RFI Attack -->
+  <rule id="300006" level="8">
+    <program_name>suricata</program_name>
+    <field name="alert.signature">.*Path.*Traversal.*|.*LFI.*|.*RFI.*</field>
+    <description>Suricata: Path traversal or file inclusion attack detected</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- Malware/Trojan Indicators -->
+  <rule id="300007" level="10">
+    <program_name>suricata</program_name>
+    <field name="alert.signature">.*Malware.*|.*Trojan.*|.*Botnet.*</field>
+    <description>Suricata: Malware or botnet activity detected</description>
+    <mitre>
+      <id>T1071</id>
+    </mitre>
+  </rule>
+
+  <!-- C2 (Command & Control) Communication -->
+  <rule id="300008" level="10">
+    <program_name>suricata</program_name>
+    <field name="alert.signature">.*C2.*|.*Command.*Control.*|.*Beacon.*</field>
+    <description>Suricata: C2 (Command & Control) beacon detected</description>
+    <mitre>
+      <id>T1071</id>
+    </mitre>
+  </rule>
+
+  <!-- DDoS Attack Signature -->
+  <rule id="300009" level="9">
+    <program_name>suricata</program_name>
+    <field name="alert.signature">.*DDoS.*|.*Volumetric.*Attack.*|.*SYN.*Flood.*</field>
+    <description>Suricata: DDoS attack detected</description>
+    <mitre>
+      <id>T1498</id>
+    </mitre>
+  </rule>
+
+  <!-- Shellcode Detection -->
+  <rule id="300010" level="10">
+    <program_name>suricata</program_name>
+    <field name="alert.signature">.*Shellcode.*|.*Buffer.*Overflow.*|.*Heap.*Spray.*</field>
+    <description>Suricata: Shellcode or exploit attempt detected</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- ========================================================================= -->
+  <!-- HONEYPOT-SPECIFIC ALERT RULES -->
+  <!-- ========================================================================= -->
+
+  <!-- Cowrie SSH Honeypot - Brute Force Detection -->
+  <rule id="300050" level="8">
+    <program_name>suricata</program_name>
+    <field name="dest.port">2222</field>
+    <field name="alert.signature">.*SSH.*Brute.*</field>
+    <description>Suricata: SSH Brute Force Attack on Cowrie Honeypot</description>
+    <group>honeypot,ssh_attack</group>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+  </rule>
+
+  <!-- Cowrie Telnet Honeypot - Authentication Attempt -->
+  <rule id="300051" level="7">
+    <program_name>suricata</program_name>
+    <field name="dest.port">2223</field>
+    <field name="alert.signature">.*Telnet.*</field>
+    <description>Suricata: Telnet Connection Attempt on Cowrie Honeypot</description>
+    <group>honeypot,telnet_attack</group>
+  </rule>
+
+  <!-- Dionaea FTP Honeypot - Authentication Attempt -->
+  <rule id="300052" level="7">
+    <program_name>suricata</program_name>
+    <field name="dest.port">21</field>
+    <field name="alert.signature">.*FTP.*</field>
+    <description>Suricata: FTP Attack on Dionaea Honeypot</description>
+    <group>honeypot,ftp_attack</group>
+  </rule>
+
+  <!-- Dionaea SMB Honeypot - Null Session or Enumeration -->
+  <rule id="300053" level="8">
+    <program_name>suricata</program_name>
+    <field name="dest.port">445</field>
+    <field name="alert.signature">.*SMB.*|.*Samba.*|.*WannaCry.*</field>
+    <description>Suricata: SMB Attack on Dionaea Honeypot</description>
+    <group>honeypot,smb_attack</group>
+    <mitre>
+      <id>T1202</id>
+    </mitre>
+  </rule>
+
+  <!-- Dionaea MSSQL Honeypot - SQL Injection or Authentication -->
+  <rule id="300054" level="8">
+    <program_name>suricata</program_name>
+    <field name="dest.port">1433</field>
+    <field name="alert.signature">.*MSSQL.*|.*SQL.*Injection.*</field>
+    <description>Suricata: MSSQL Attack on Dionaea Honeypot</description>
+    <group>honeypot,sql_attack</group>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- Dionaea MySQL Honeypot - SQL Injection or Authentication -->
+  <rule id="300055" level="8">
+    <program_name>suricata</program_name>
+    <field name="dest.port">3306</field>
+    <field name="alert.signature">.*MySQL.*|.*SQL.*Injection.*</field>
+    <description>Suricata: MySQL Attack on Dionaea Honeypot</description>
+    <group>honeypot,sql_attack</group>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- Dionaea RDP Honeypot - Connection Attempt -->
+  <rule id="300056" level="7">
+    <program_name>suricata</program_name>
+    <field name="dest.port">3389</field>
+    <field name="alert.signature">.*RDP.*</field>
+    <description>Suricata: RDP Connection Attempt on Dionaea Honeypot</description>
+    <group>honeypot,rdp_attack</group>
+  </rule>
+
+  <!-- OWASP Juice Shop Web Honeypot - SQL Injection -->
+  <rule id="300060" level="9">
+    <program_name>suricata</program_name>
+    <field name="dest.port">443</field>
+    <field name="alert.signature">.*Juice.*Shop.*|.*SQL.*Injection.*</field>
+    <description>Suricata: SQL Injection Attack on OWASP Juice Shop</description>
+    <group>honeypot,webapp_attack,sql_injection</group>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- OWASP Juice Shop Web Honeypot - XSS Attack -->
+  <rule id="300061" level="8">
+    <program_name>suricata</program_name>
+    <field name="dest.port">443</field>
+    <field name="alert.signature">.*Juice.*Shop.*|.*XSS.*</field>
+    <description>Suricata: XSS Attack on OWASP Juice Shop</description>
+    <group>honeypot,webapp_attack,xss</group>
+    <mitre>
+      <id>T1598</id>
+    </mitre>
+  </rule>
+
+  <!-- OWASP Juice Shop Web Honeypot - Brute Force Login -->
+  <rule id="300062" level="8">
+    <program_name>suricata</program_name>
+    <field name="dest.port">443</field>
+    <field name="alert.signature">.*Juice.*Shop.*|.*Brute.*Force.*</field>
+    <description>Suricata: Brute Force Login Attack on OWASP Juice Shop</description>
+    <group>honeypot,webapp_attack,auth_attack</group>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+  <!-- OWASP WebGoat Web Honeypot - SQL Injection -->
+  <rule id="300063" level="9">
+    <program_name>suricata</program_name>
+    <field name="dest.port">8443</field>
+    <field name="alert.signature">.*WebGoat.*|.*SQL.*Injection.*</field>
+    <description>Suricata: SQL Injection Attack on OWASP WebGoat</description>
+    <group>honeypot,webapp_attack,sql_injection</group>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- OWASP WebGoat Web Honeypot - Command Injection -->
+  <rule id="300064" level="9">
+    <program_name>suricata</program_name>
+    <field name="dest.port">8443</field>
+    <field name="alert.signature">.*WebGoat.*|.*Command.*Injection.*</field>
+    <description>Suricata: Command Injection Attack on OWASP WebGoat</description>
+    <group>honeypot,webapp_attack,command_injection</group>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- OWASP WebGoat Web Honeypot - CSRF Attack -->
+  <rule id="300065" level="8">
+    <program_name>suricata</program_name>
+    <field name="dest.port">8443</field>
+    <field name="alert.signature">.*WebGoat.*|.*CSRF.*</field>
+    <description>Suricata: CSRF Attack on OWASP WebGoat</description>
+    <group>honeypot,webapp_attack,csrf</group>
+    <mitre>
+      <id>T1598</id>
+    </mitre>
+  </rule>
+
+  <!-- Worm/Malware Propagation from Honeypot -->
+  <rule id="300072" level="10">
+    <program_name>suricata</program_name>
+    <field name="alert.signature">.*Malware.*Propagation.*|.*Worm.*</field>
+    <description>Suricata: Worm or malware propagation detected from honeypot</description>
+    <group>honeypot,malware,propagation</group>
+    <mitre>
+      <id>T1570</id>
+    </mitre>
+  </rule>
+
+  <!-- Alert on Any Critical Suricata Alert (Severity >= 5) -->
+  <rule id="300080" level="9">
+    <program_name>suricata</program_name>
+    <field name="alert.severity">4|5</field>
+    <description>Suricata: Critical/High severity alert - immediate attention required</description>
+    <group>critical,suricata_critical</group>
+  </rule>
+
+</group>

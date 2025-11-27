@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Web Application Honeypot Decoders
+  Detects and parses attacks against OWASP Juice Shop and WebGoat
+-->
+
+<decoder_array>
+  <!-- =====================================================================
+       JUICE SHOP DECODERS
+       ===================================================================== -->
+
+  <!-- SQL Injection Detection -->
+  <decoder name="juice_shop_sql_injection">
+    <program_name>juice-shop</program_name>
+    <prematch>SQL.*injection|sql.*error|unexpected token|syntax error</prematch>
+  </decoder>
+
+  <!-- XSS Attack Detection -->
+  <decoder name="juice_shop_xss_attack">
+    <program_name>juice-shop</program_name>
+    <prematch>script|onerror|onclick|javascript:|eval\(</prematch>
+  </decoder>
+
+  <!-- Path Traversal Detection -->
+  <decoder name="juice_shop_path_traversal">
+    <program_name>juice-shop</program_name>
+    <prematch>\.\./|\.\.\%|\.\.\\|directory traversal</prematch>
+  </decoder>
+
+  <!-- Authentication Bypass -->
+  <decoder name="juice_shop_auth_bypass">
+    <program_name>juice-shop</program_name>
+    <prematch>admin.*login|unauthorized|forbidden|403|401</prematch>
+  </decoder>
+
+  <!-- Sensitive Data Exposure -->
+  <decoder name="juice_shop_data_exposure">
+    <program_name>juice-shop</program_name>
+    <prematch>api.key|password|secret|token|credit.card</prematch>
+  </decoder>
+
+  <!-- File Upload Attacks -->
+  <decoder name="juice_shop_file_upload">
+    <program_name>juice-shop</program_name>
+    <prematch>upload|file|exe|php|jsp|aspx|shell</prematch>
+  </decoder>
+
+  <!-- Broken Access Control -->
+  <decoder name="juice_shop_access_control">
+    <program_name>juice-shop</program_name>
+    <prematch>user.id|parameter.tampering|privilege.escalation</prematch>
+  </decoder>
+
+  <!-- Broken Object Level Authorization (BOLA) -->
+  <decoder name="juice_shop_bola">
+    <program_name>juice-shop</program_name>
+    <prematch>BOLA|/api/.*\d+|/rest/.*\d+|object.reference</prematch>
+  </decoder>
+
+  <!-- Brute Force Attack -->
+  <decoder name="juice_shop_brute_force">
+    <program_name>juice-shop</program_name>
+    <prematch>login.*failed|invalid.*password|user.*not.found</prematch>
+  </decoder>
+
+  <!-- <!-- =====================================================================
+       WEBGOAT DECODERS
+       ===================================================================== -->
+
+  <!-- WebGoat General Access -->
+  <decoder name="webgoat_access">
+    <program_name>webgoat</program_name>
+    <prematch>GET|POST|PUT|DELETE|PATCH</prematch>
+  </decoder>
+
+  <!-- WebGoat Lesson SQL Injection -->
+  <decoder name="webgoat_sql_lesson">
+    <program_name>webgoat</program_name>
+    <prematch>lesson.*sql|sql.*injection|SQLi</prematch>
+  </decoder>
+
+  <!-- WebGoat Authentication Challenge -->
+  <decoder name="webgoat_auth_lesson">
+    <program_name>webgoat</program_name>
+    <prematch>lesson.*auth|authentication|bypass</prematch>
+  </decoder>
+
+  <!-- WebGoat XXE Lesson -->
+  <decoder name="webgoat_xxe_lesson">
+    <program_name>webgoat</program_name>
+    <prematch>xml.*external|XXE|DOCTYPE</prematch>
+  </decoder>
+
+  <!-- WebGoat CSRF Lesson -->
+  <decoder name="webgoat_csrf_lesson">
+    <program_name>webgoat</program_name>
+    <prematch>csrf|cross.site.request|token</prematch>
+  </decoder>
+
+  <!-- WebGoat RCE Lesson -->
+  <decoder name="webgoat_rce_lesson">
+    <program_name>webgoat</program_name>
+    <prematch>remote.code|command.injection|exec|system</prematch>
+  </decoder>
+
+  <!-- WebGoat LDAP Lesson -->
+  <decoder name="webgoat_ldap_lesson">
+    <program_name>webgoat</program_name>
+    <prematch>ldap.*injection|directory.service|cn=</prematch>
+  </decoder>
+
+  <!-- WebGoat Path Traversal Lesson -->
+  <decoder name="webgoat_path_lesson">
+    <program_name>webgoat</program_name>
+    <prematch>path.*traversal|directory.traversal|\.\./</prematch>
+  </decoder>
+
+  <!-- WebGoat JSON Web Token (JWT) -->
+  <decoder name="webgoat_jwt_lesson">
+    <program_name>webgoat</program_name>
+    <prematch>JWT|json.web.token|eyJ</prematch>
+  </decoder>
+
+  <!-- WebGoat Sensitive Data Exposure -->
+  <decoder name="webgoat_sensitive_lesson">
+    <program_name>webgoat</program_name>
+    <prematch>sensitive.data|exposure|encryption|ssl</prematch>
+  </decoder>
+
+  <!-- Generic HTTP Error Responses (Both Apps) -->
+  <decoder name="webapp_http_error">
+    <program_name>juice-shop|webgoat</program_name>
+    <prematch>error|exception|400|500|502|503|504</prematch>
+  </decoder>
+
+  <!-- Generic HTTP Access Logs (Both Apps) -->
+  <decoder name="webapp_http_access">
+    <program_name>juice-shop|webgoat</program_name>
+    <prematch>GET|POST|PUT|DELETE|PATCH</prematch>
+    <regex_type>pcre2</regex_type>
+    <regex>(\S+)\s+(\S+)\s+(\S+)\s+\[(\S+\s\S+)\]\s+\"(\S+)\s+(\S+)\s+(\S+)\"\s+(\d+)</regex>
+  </decoder>
+
+</decoder_array>

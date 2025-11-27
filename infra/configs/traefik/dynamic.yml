@@ -293,35 +293,45 @@ http:
     # HONEYPOT SERVICES - INTERNAL NETWORK ONLY
     # =========================================================================
 
-    # Cowrie SSH/Telnet Honeypot Dashboard
-    cowrie-dashboard:
-      rule: "Host(`cowrie.cyberlab.local`)"
+    # Cowrie SSH/Telnet Honeypot - No web UI, routing via TCP only
+    # Access via SSH: ssh -p 2222 user@cowrie.cyberlab.local
+    # Access via Telnet: telnet cowrie.cyberlab.local 2223
+    
+    # Dionaea Multi-Protocol Honeypot - No web UI dashboard
+    # Access via FTP: ftp dionaea.cyberlab.local
+    # Access via SMB: smbclient //dionaea.cyberlab.local/share
+    # Access via MySQL: mysql -h dionaea.cyberlab.local -P 3306
+    
+    # NOTE: Honeypots are routed via TCP entry points in the tcp section below
+    # HTTP routers removed as honeypots do not provide web dashboards
+
+    # =========================================================================
+    # WEB APPLICATION HONEYPOTS - OWASP VULNERABLE APPLICATIONS
+    # =========================================================================
+
+    # OWASP Juice Shop - Vulnerable E-commerce Application
+    juice-shop:
+      rule: "Host(`juice-shop.cyberlab.local`) || Host(`juice.cyberlab.local`)"
       entryPoints:
         - "websecure"
-      service: "cowrie-svc"
+      service: "juice-shop-svc"
       tls: {}
       middlewares:
         - "security-headers"
         - "compression"
-        - "security-net-access"
+        - "internal-net-access"
 
-    # Dionaea Multi-Protocol Honeypot Dashboard
-    dionaea-dashboard:
-      rule: "Host(`dionaea.cyberlab.local`)"
+    # OWASP WebGoat - Web Application Security Training
+    webgoat:
+      rule: "Host(`webgoat.cyberlab.local`)"
       entryPoints:
         - "websecure"
-      service: "dionaea-svc"
+      service: "webgoat-svc"
       tls: {}
       middlewares:
         - "security-headers"
         - "compression"
-        - "security-net-access"
-
-    # NOTE: If you need Traefik to serve a specific certificate per-domain, consider
-    # adding a file-provider router that references the backend service and uses a
-    # TLS store with a configured defaultCertificate. The 'certificates' field
-    # under a router 'tls' is not recognized by the current provider schema and
-    # will cause a file provider parse error.
+        - "internal-net-access"
 
   services:
     neuvector:
@@ -403,18 +413,18 @@ http:
           - url: "http://grafana:3000"
 
     # =========================================================================
-    # HONEYPOT SERVICES - LOAD BALANCERS
+    # WEB APPLICATION HONEYPOT SERVICES
     # =========================================================================
 
-    cowrie-svc:
+    juice-shop-svc:
       loadBalancer:
         servers:
-          - url: "http://cowrie:8000"
+          - url: "http://juice-shop:3000"
 
-    dionaea-svc:
+    webgoat-svc:
       loadBalancer:
         servers:
-          - url: "http://dionaea:80"
+          - url: "http://webgoat:8080"
 
   serversTransports:
       # Server transport for NeuVector and other HTTPS backends

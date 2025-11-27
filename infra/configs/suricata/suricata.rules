@@ -291,3 +291,74 @@ alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"ZERO-DAY: Shellcode Injection
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"ZERO-DAY: Heap Spray Attack Signature"; flow:to_server; content:"HEAP"; nocase; threshold:type both, track by_src, count 5, seconds 60; classtype:shellcode-detect; sid:1001118; rev:1; metadata: description "Heap spray pattern for memory corruption exploitation.";)
 
 alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"ANOMALY: Fragmented Packet Reassembly - Evasion Attempt"; flags:M; threshold:type both, track by_src, count 100, seconds 60; classtype:suspicious-activity; sid:1001119; rev:1; metadata: description "Excessive IP fragmentation potentially bypassing IDS detection.";)
+
+# =============================================================================
+# HONEYPOT ATTACK DETECTION (2000000-2000099)
+# =============================================================================
+# Rules for detecting attacks against honeypot services
+# These rules specifically target: Cowrie SSH/Telnet, Dionaea FTP/SMB/SQL, OWASP apps
+# All detections logged to Wazuh for SIEM correlation and incident tracking
+
+# Cowrie SSH Honeypot Attacks (Port 2222)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 2222 (msg:"HONEYPOT: SSH Brute Force Attack on Cowrie Honeypot"; flow:to_server,established; content:"SSH"; threshold:type both, track by_src, count 3, seconds 30; classtype:attempted-user; sid:2000001; rev:1; metadata: description "Multiple SSH authentication attempts on Cowrie honeypot (port 2222)"; mitre_tactic:"TA0003";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 2222 (msg:"HONEYPOT: SSH Root Account Compromise Attempt on Cowrie"; flow:to_server,established; content:"root"; nocase; threshold:type both, track by_src, count 2, seconds 60; classtype:attempted-admin; sid:2000002; rev:1; metadata: description "Root account login attempts on Cowrie SSH honeypot"; mitre_attack:"T1110.001"; mitre_tactic:"TA0003";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 2222 (msg:"HONEYPOT: SSH Banner Grabbing on Cowrie"; flow:to_server; content:"SSH-"; classtype:attempted-recon; sid:2000003; rev:1; metadata: description "SSH version identification attempt on Cowrie honeypot"; mitre_attack:"T1046"; mitre_tactic:"TA0007";)
+
+# Cowrie Telnet Honeypot Attacks (Port 2223)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 2223 (msg:"HONEYPOT: Telnet Authentication Attempt on Cowrie Honeypot"; flow:to_server,established; content:"Telnet"; threshold:type both, track by_src, count 3, seconds 60; classtype:attempted-user; sid:2000004; rev:1; metadata: description "Multiple Telnet connection attempts on Cowrie honeypot (port 2223)"; mitre_attack:"T1110";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 2223 (msg:"HONEYPOT: Suspicious Telnet Command Execution on Cowrie"; flow:to_server,established; content:"|0d 0a|"; nocase; threshold:type both, track by_src, count 5, seconds 60; classtype:suspicious-activity; sid:2000005; rev:1; metadata: description "Multiple command executions on Cowrie Telnet honeypot";)
+
+# Dionaea FTP Honeypot Attacks (Port 21)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"HONEYPOT: FTP Brute Force Attack on Dionaea Honeypot"; flow:to_server,established; content:"USER"; threshold:type both, track by_src, count 3, seconds 60; classtype:attempted-user; sid:2000010; rev:1; metadata: description "Multiple FTP authentication attempts on Dionaea honeypot (port 21)"; mitre_attack:"T1110.001";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"HONEYPOT: FTP Anonymous Access Attempt on Dionaea"; flow:to_server,established; content:"anonymous"; nocase; threshold:type both, track by_src, count 2, seconds 60; classtype:suspicious-activity; sid:2000011; rev:1; metadata: description "Anonymous FTP login attempt on Dionaea honeypot";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"HONEYPOT: FTP Directory Listing Enumeration on Dionaea"; flow:to_server,established; content:"LIST"; nocase; threshold:type both, track by_src, count 10, seconds 60; classtype:suspicious-activity; sid:2000012; rev:1; metadata: description "Rapid directory listing requests on Dionaea FTP honeypot";)
+
+# Dionaea SMB/Samba Honeypot Attacks (Port 445)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 445 (msg:"HONEYPOT: SMB Null Session Attempt on Dionaea"; flow:to_server,established; content:"SMB"; threshold:type both, track by_src, count 2, seconds 60; classtype:attempted-recon; sid:2000020; rev:1; metadata: description "SMB null session enumeration on Dionaea honeypot (port 445)"; mitre_attack:"T1202";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 445 (msg:"HONEYPOT: SMB Share Enumeration on Dionaea"; flow:to_server,established; content:"IPC"; nocase; threshold:type both, track by_src, count 5, seconds 60; classtype:suspicious-activity; sid:2000021; rev:1; metadata: description "Rapid share enumeration on Dionaea SMB honeypot";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 445 (msg:"HONEYPOT: WannaCry SMB Exploit Signature on Dionaea"; flow:to_server,established; content:"wannacry"; nocase; classtype:attempted-dos; sid:2000022; rev:1; metadata: description "WannaCry SMB exploit attempt detected on Dionaea";)
+
+# Dionaea MySQL Honeypot Attacks (Port 3306)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3306 (msg:"HONEYPOT: MySQL Authentication Attempt on Dionaea"; flow:to_server,established; content:"mysql"; nocase; threshold:type both, track by_src, count 3, seconds 60; classtype:attempted-user; sid:2000030; rev:1; metadata: description "Multiple MySQL authentication attempts on Dionaea honeypot (port 3306)"; mitre_attack:"T1110.001";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3306 (msg:"HONEYPOT: SQL Injection Attack on Dionaea MySQL"; flow:to_server,established; content:"UNION"; nocase; threshold:type both, track by_src, count 2, seconds 60; classtype:web-application-attack; sid:2000031; rev:1; metadata: description "SQL injection attempt via UNION select on Dionaea MySQL honeypot"; mitre_attack:"T1190";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3306 (msg:"HONEYPOT: MySQL Root Access Attempt on Dionaea"; flow:to_server,established; content:"root"; nocase; threshold:type both, track by_src, count 3, seconds 60; classtype:attempted-admin; sid:2000032; rev:1; metadata: description "Root account access attempts on Dionaea MySQL honeypot";)
+
+# Dionaea MSSQL Honeypot Attacks (Port 1433)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1433 (msg:"HONEYPOT: MSSQL Authentication Attempt on Dionaea"; flow:to_server,established; threshold:type both, track by_src, count 3, seconds 60; classtype:attempted-user; sid:2000040; rev:1; metadata: description "Multiple MSSQL authentication attempts on Dionaea honeypot (port 1433)"; mitre_attack:"T1110";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1433 (msg:"HONEYPOT: MSSQL Injection Attack on Dionaea"; flow:to_server,established; content:"exec"; nocase; threshold:type both, track by_src, count 2, seconds 60; classtype:web-application-attack; sid:2000041; rev:1; metadata: description "SQL injection via exec() attempt on Dionaea MSSQL honeypot"; mitre_attack:"T1190";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 1433 (msg:"HONEYPOT: MSSQL SA Account Compromise on Dionaea"; flow:to_server,established; content:"sa"; nocase; threshold:type both, track by_src, count 3, seconds 60; classtype:attempted-admin; sid:2000042; rev:1; metadata: description "SA (admin) account access attempts on Dionaea MSSQL honeypot";)
+
+# OWASP Juice Shop Web Honeypot Attacks (Port 443/HTTPS)
+alert http $EXTERNAL_NET any -> $HOME_NET 443 (msg:"HONEYPOT: SQL Injection Attack on Juice Shop"; flow:to_server,established; http_uri; content:"/api/"; content:"UNION"; nocase; within:200; classtype:web-application-attack; sid:2000050; rev:1; metadata: description "SQL injection attempt detected on OWASP Juice Shop honeypot"; mitre_attack:"T1190"; mitre_tactic:"TA0001";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET 443 (msg:"HONEYPOT: Cross-Site Scripting (XSS) Attack on Juice Shop"; flow:to_server,established; http_uri; content:"<script"; nocase; classtype:web-application-attack; sid:2000051; rev:1; metadata: description "XSS payload detected in request to Juice Shop honeypot"; mitre_attack:"T1598"; mitre_tactic:"TA0001";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET 443 (msg:"HONEYPOT: Path Traversal Attack on Juice Shop"; flow:to_server,established; http_uri; content:".."; http_raw_uri; threshold:type both, track by_src, count 3, seconds 60; classtype:web-application-attack; sid:2000052; rev:1; metadata: description "Path traversal (LFI/RFI) attempt on Juice Shop honeypot"; mitre_attack:"T1190";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET 443 (msg:"HONEYPOT: Brute Force Attack on Juice Shop Login"; flow:to_server,established; http_uri; content:"/login"; nocase; threshold:type both, track by_src, count 5, seconds 60; classtype:attempted-user; sid:2000053; rev:1; metadata: description "Multiple login attempts on Juice Shop honeypot"; mitre_attack:"T1110";)
+
+# OWASP WebGoat Web Honeypot Attacks (Port 8443/HTTPS)
+alert http $EXTERNAL_NET any -> $HOME_NET 8443 (msg:"HONEYPOT: SQL Injection Attack on WebGoat"; flow:to_server,established; http_uri; content:"/api/"; content:"SELECT"; nocase; within:200; classtype:web-application-attack; sid:2000060; rev:1; metadata: description "SQL injection attempt on OWASP WebGoat honeypot"; mitre_attack:"T1190";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET 8443 (msg:"HONEYPOT: Command Injection Attack on WebGoat"; flow:to_server,established; http_uri; content:"|"; classtype:web-application-attack; sid:2000061; rev:1; metadata: description "Command injection attempt on WebGoat honeypot"; mitre_attack:"T1190";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET 8443 (msg:"HONEYPOT: CSRF Attack on WebGoat"; flow:to_server,established; http_header; content:"Referer|3a|"; nocase; content:!".cyberlab.local"; classtype:web-application-attack; sid:2000062; rev:1; metadata: description "CSRF attack detected on WebGoat honeypot"; mitre_attack:"T1598";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET 8443 (msg:"HONEYPOT: Brute Force Attack on WebGoat Login"; flow:to_server,established; http_uri; content:"/login"; nocase; threshold:type both, track by_src, count 5, seconds 60; classtype:attempted-user; sid:2000063; rev:1; metadata: description "Multiple login attempts on WebGoat honeypot"; mitre_attack:"T1110";)
+
+# Honeypot Aggregate Detection - Multiple Attack Types
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"HONEYPOT: Worm/Malware Propagation from Compromised Honeypot"; flow:to_server,established; threshold:type both, track by_src, count 10, seconds 60; classtype:trojan-activity; sid:2000070; rev:1; metadata: description "Multiple outbound connections from honeypot indicating infection/propagation"; mitre_attack:"T1570";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"HONEYPOT: Coordinated Attack Against Multiple Honeypot Services"; flow:to_server; threshold:type both, track by_src, count 3, seconds 300; classtype:suspicious-activity; sid:2000071; rev:1; metadata: description "Attacker targeting multiple honeypot services - coordinated campaign"; mitre_attack:"T1087";)
+
