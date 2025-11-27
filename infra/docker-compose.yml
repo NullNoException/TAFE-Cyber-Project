@@ -67,7 +67,7 @@ services:
   # NeuVector All-in-One - Container Security Platform
   # ---------------------------------------------------------------------------
   neuvector-allinone:
-    image: neuvector/allinone:5.3.5
+    image: neuvector/allinone:5.4.7
     container_name: neuvector.allinone
     hostname: neuvector-allinone
     pid: host
@@ -93,17 +93,21 @@ services:
       management_net:
         ipv4_address: 10.10.40.254
     environment:
-      - CLUSTER_JOIN_ADDR=10.10.0.10
       - NV_PLATFORM_INFO=platform=Docker
-      - NV_LOG_LEVEL=info
+      - NV_LOG_LEVEL=debug
+      - NV_REST_URL=https://127.0.0.1:8443
+      - CLUSTER_IP_INTERNAL=127.0.0.1
+      - CLUSTER_IP_EXTERNAL=127.0.0.1
       - TZ=UTC
     ports:
+      - "8443:8443"
+      - "10443:10443"
+      - "11443:11443"
       - "18300:18300"
       - "18301:18301"
       - "18400:18400"
       - "18401:18401"
       - "18301:18301/udp"
-      - "8443:8443"
     volumes:
       - /lib/modules:/lib/modules:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -768,14 +772,17 @@ services:
       - NET_ADMIN
       - NET_RAW
       - SYS_NICE
+      - NET_BIND_SERVICE
+    privileged: false
     volumes:
       - suricata_logs:/var/log/suricata
-      - suricata_rules:/var/lib/suricata
       - ./configs/suricata/suricata.yaml:/etc/suricata/suricata.yaml
       - ./configs/suricata/suricata.rules:/var/lib/suricata/suricata.rules
     environment:
       - TZ=UTC
-    command: -i eth0 -l /var/log/suricata
+      - SURICATA_HOME=/var/lib/suricata
+    # Suricata IDS mode with eve-log output for Wazuh integration
+    command: -c /etc/suricata/suricata.yaml -i eth1
     logging:
       driver: syslog
       options:
@@ -784,9 +791,14 @@ services:
     deploy:
       resources:
         limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
           cpus: "1.0"
           memory: 2G
     restart: unless-stopped
+    depends_on:
+      - wazuh.manager
     # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
 
   # ===========================================================================

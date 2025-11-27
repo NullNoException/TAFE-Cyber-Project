@@ -1,80 +1,131 @@
+# =============================================================================
 # Suricata IDS/IPS Rules - CyberLab Security Infrastructure
-# Comprehensive rule set for detecting and alerting on security threats
+# =============================================================================
+#
+# Comprehensive rule set for detecting, alerting, and preventing security threats
+# All alerts are logged to Wazuh via syslog (port 514) and eve.json for analysis
 # Updated: 2025
 #
 # Rule ID Ranges:
-# 1000000-1000099: Reconnaissance & Scanning
+# 1000000-1000099: Reconnaissance & Scanning (Port Scans, Enumeration)
 # 1000100-1000199: SQL Injection & Database Attacks
-# 1000200-1000299: Command Injection & RCE
-# 1000300-1000399: Authentication & Credential Attacks
-# 1000400-1000499: Malware & Suspicious Traffic
-# 1000500-1000599: Network Exploits
-# 1000600-1000699: Web Application Attacks
-# 1000700-1000799: Lateral Movement & Post-Exploitation
-# 1000800-1000899: Exfiltration & Data Theft
-# 1000900-1000999: DNS & Protocol Anomalies
+# 1000200-1000299: Command Injection & RCE Attacks
+# 1000300-1000399: Authentication & Credential Attacks (Brute Force, Bypass)
+# 1000400-1000499: Malware & Suspicious Traffic (C2, Botnets)
+# 1000500-1000599: Network Exploits (Buffer Overflow, CVE Exploits)
+# 1000600-1000699: Web Application Attacks (XSS, CSRF, LFI/RFI)
+# 1000700-1000799: Lateral Movement & Post-Exploitation (Pivoting, Persistence)
+# 1000800-1000899: Exfiltration & Data Theft (Tunneling, Bulk Transfers)
+# 1000900-1000999: DNS & Protocol Anomalies (Tunneling, Floods)
+# 1001000-1001100: DDoS & Volumetric Attacks
+# 1001100-1001200: Advanced Threat Detection (Zero-Day, Anomalies)
+#
+# Alert Action: 'alert' (logs to Wazuh) | 'drop' (IPS mode - blocks traffic)
+# Output: Syslog (local5) + eve.json (JSON format)
 
 
 # ============================================================================
 # RECONNAISSANCE & SCANNING (1000000-1000099)
 # ============================================================================
 
-# Port Scanning Detection
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"ET POLICY TCP Port Scan"; flow:to_server; flags:S; threshold:type both, track by_src, count 10, seconds 60; reference:url,doc.emergingthreats.net; classtype:attempted-recon; sid:1000001; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"ET POLICY SYN Scan from External Network"; flow:to_server; flags:S; fast_pattern:only; threshold:type both, track by_src, count 50, seconds 60; classtype:attempted-recon; sid:1000002; rev:1;)
-alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ET POLICY ICMP Ping Sweep"; icmp_type: 8; threshold:type both, track by_src, count 20, seconds 60; classtype:attempted-recon; sid:1000003; rev:1;)
-alert udp $EXTERNAL_NET 53 -> $HOME_NET any (msg:"ET POLICY DNS Enumeration Attempt"; content:"axfr"; nocase; classtype:attempted-recon; sid:1000004; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 22 (msg:"ET POLICY SSH Brute Force Attempt"; flow:to_server,established; content:"SSH"; classtype:attempted-recon; sid:1000005; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"ET POLICY Nmap OS Detection Probe"; content:"OSScan"; classtype:attempted-recon; sid:1000006; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"ET POLICY Metasploit Port Scanner"; content:"Metasploit"; classtype:attempted-recon; sid:1000007; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"ET POLICY Service Enumeration Attempt"; content:"HTTP/1."; classtype:attempted-recon; sid:1000008; rev:1;)
-alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"ET POLICY ICMP Traceroute Detection"; icmp_type: 11; classtype:attempted-recon; sid:1000009; rev:1;)
-alert udp $EXTERNAL_NET any -> $HOME_NET any (msg:"ET POLICY SNMP Community String Probe"; content:"public|00|"; classtype:attempted-recon; sid:1000010; rev:1;)
+# =============================================================================
+# Port Scanning Detection - Multiple SYN flags indicate reconnaissance activity
+# =============================================================================
 
-# ============================================================================
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCANNING: TCP Port Scan Detected - Rapid SYN to Multiple Ports"; flow:to_server; flags:S; threshold:type both, track by_src, count 10, seconds 60; content:!"HTTP"; reference:url,doc.emergingthreats.net; classtype:attempted-recon; sid:1000001; rev:2; metadata: description "Detects multiple TCP SYN packets from single source indicating port scanning activity. Typical of nmap -sS scans.";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCANNING: SYN Flood / Port Scan - Multiple Services Probed"; flow:to_server; flags:S; fast_pattern:only; threshold:type both, track by_src, count 50, seconds 60; classtype:attempted-recon; sid:1000002; rev:2; metadata: description "Multiple TCP SYN packets within 60 seconds - aggressive port enumeration.";)
+
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCANNING: ICMP Ping Sweep Detection - Network Reconnaissance"; icmp_type: 8; threshold:type both, track by_src, count 20, seconds 60; classtype:attempted-recon; sid:1000003; rev:2; metadata: description "Detects ICMP Echo Request (ping) sweeps used to identify live hosts.";)
+
+alert udp $EXTERNAL_NET 53 -> $HOME_NET any (msg:"SCANNING: DNS Zone Transfer Attempt - AXFR Request"; content:"axfr"; nocase; classtype:attempted-recon; sid:1000004; rev:2; metadata: description "Attempts to perform DNS zone transfer to enumerate all DNS records.";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 22 (msg:"SCANNING: SSH Brute Force Attack Detected"; flow:to_server,established; threshold:type both, track by_src, count 5, seconds 60; classtype:attempted-user; sid:1000005; rev:2; metadata: description "Multiple SSH connection attempts from single source - credential attack.";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCANNING: Nmap OS Fingerprinting Detection"; content:"OSScan"; nocase; classtype:attempted-recon; sid:1000006; rev:2; metadata: description "Nmap OS detection patterns detected in traffic.";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCANNING: Metasploit Scanner Signature Detected"; content:"Metasploit"; nocase; classtype:attempted-recon; sid:1000007; rev:2; metadata: description "Metasploit framework scanning signatures identified.";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET !22 (msg:"SCANNING: HTTP Service Banner Grab Attempt"; content:"GET"; http_method; content:"HTTP/1."; http_protocol; threshold:type both, track by_src, count 5, seconds 30; classtype:attempted-recon; sid:1000008; rev:2; metadata: description "Rapid HTTP requests to multiple ports for service enumeration.";)
+
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCANNING: ICMP Traceroute Detection"; icmp_type: 11; classtype:attempted-recon; sid:1000009; rev:2; metadata: description "Time Exceeded (ICMP type 11) used in traceroute operations.";)
+
+alert udp $EXTERNAL_NET any -> $HOME_NET 161 (msg:"SCANNING: SNMP Default Community String Probe"; content:"public|00|"; classtype:attempted-recon; sid:1000010; rev:2; metadata: description "SNMP community string enumeration attempt using default 'public' string.";)
+
+# =============================================================================
 # SQL INJECTION & DATABASE ATTACKS (1000100-1000199)
-# ============================================================================
+# Attacks designed to manipulate SQL queries and extract or modify data
+# =============================================================================
 
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK SQL Injection - SELECT Statement"; flow:to_server,established; content:"GET"; http_method; content:"SELECT"; nocase; classtype:web-application-attack; sid:1000100; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK SQL Injection - UNION Based"; flow:to_server,established; content:"GET"; http_method; content:"UNION"; nocase; classtype:web-application-attack; sid:1000101; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK SQL Injection - Boolean Based"; flow:to_server,established; content:"GET"; http_method; content:"AND 1=1"; nocase; classtype:web-application-attack; sid:1000102; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK SQL Injection - Time Based Blind"; flow:to_server,established; content:"GET"; http_method; content:"SLEEP"; nocase; classtype:web-application-attack; sid:1000103; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK SQL Injection - DROP TABLE"; flow:to_server,established; content:"GET"; http_method; content:"DROP TABLE"; nocase; classtype:web-application-attack; sid:1000104; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK SQL Injection - INSERT INTO"; flow:to_server,established; content:"GET"; http_method; content:"INSERT INTO"; nocase; classtype:web-application-attack; sid:1000105; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK SQL Injection - UPDATE Statement"; flow:to_server,established; content:"GET"; http_method; content:"UPDATE"; nocase; classtype:web-application-attack; sid:1000106; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK SQL Injection - EXEC"; flow:to_server,established; content:"GET"; http_method; content:"EXEC"; nocase; classtype:web-application-attack; sid:1000107; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK SQL Injection - Comment Bypass"; flow:to_server,established; content:"GET"; http_method; content:"--|"; classtype:web-application-attack; sid:1000108; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK SQL Injection - Stacked Queries"; flow:to_server,established; content:"GET"; http_method; content:";DROP"; nocase; classtype:web-application-attack; sid:1000109; rev:1;)
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"SQL-INJECTION: SELECT Statement with Query Manipulation"; flow:to_server,established; content:"GET"; http_method; content:"SELECT"; nocase; pcre:"/(\?|&)(id|user|search|q)=.*SELECT/i"; classtype:web-application-attack; sid:1000100; rev:2; metadata: description "SQL SELECT injection attempt in URL parameters.";)
 
-# ============================================================================
-# COMMAND INJECTION & RCE (1000200-1000299)
-# ============================================================================
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"SQL-INJECTION: UNION-Based Attack - Multi-Table Query"; flow:to_server,established; content:"GET"; http_method; content:"UNION"; nocase; pcre:"/UNION\s+(ALL\s+)?SELECT/i"; classtype:web-application-attack; sid:1000101; rev:2; metadata: description "UNION-based SQL injection to extract data from multiple tables.";)
 
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Command Injection - Common Patterns"; flow:to_server,established; content:"GET"; http_method; content:"|"; classtype:web-application-attack; sid:1000200; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Command Injection - backticks"; flow:to_server,established; content:"GET"; http_method; content:"`"; classtype:web-application-attack; sid:1000201; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Command Injection - $(command)"; flow:to_server,established; content:"GET"; http_method; content:"$("; classtype:web-application-attack; sid:1000202; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK OS Command Injection - bash"; flow:to_server,established; content:"GET"; http_method; content:"/bin/bash"; nocase; classtype:web-application-attack; sid:1000203; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK OS Command Injection - sh"; flow:to_server,established; content:"GET"; http_method; content:"/bin/sh"; nocase; classtype:web-application-attack; sid:1000204; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Remote Code Execution - PHP eval"; flow:to_server,established; content:"POST"; http_method; content:"eval"; nocase; classtype:web-application-attack; sid:1000205; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Remote Code Execution - System exec"; flow:to_server,established; content:"GET"; http_method; content:"system"; nocase; classtype:web-application-attack; sid:1000206; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Remote Code Execution - Passthru"; flow:to_server,established; content:"GET"; http_method; content:"passthru"; nocase; classtype:web-application-attack; sid:1000207; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Remote Code Execution - Exec"; flow:to_server,established; content:"GET"; http_method; content:"exec"; nocase; classtype:web-application-attack; sid:1000208; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Remote Code Execution - Shell_exec"; flow:to_server,established; content:"GET"; http_method; content:"shell_exec"; nocase; classtype:web-application-attack; sid:1000209; rev:1;)
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"SQL-INJECTION: Boolean-Based Blind Injection - Conditional Logic"; flow:to_server,established; content:"GET"; http_method; pcre:"/(\sOR\s1=1|\sAND\s1=1)/i"; classtype:web-application-attack; sid:1000102; rev:2; metadata: description "Boolean-based blind SQL injection testing conditional statements.";)
 
-# ============================================================================
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"SQL-INJECTION: Time-Based Blind - Delayed Response"; flow:to_server,established; content:"GET"; http_method; content:"SLEEP"; nocase; content:"("; distance:0; within:20; classtype:web-application-attack; sid:1000103; rev:2; metadata: description "Time-based blind SQL injection using SLEEP/WAITFOR functions.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"SQL-INJECTION: Data Destruction - DROP TABLE Command"; flow:to_server,established; content:"GET"; http_method; content:"DROP"; nocase; content:"TABLE"; nocase; distance:0; within:30; classtype:web-application-attack; sid:1000104; rev:2; metadata: description "SQL DROP TABLE attack attempting database destruction.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"SQL-INJECTION: Data Insertion Attack - INSERT INTO"; flow:to_server,established; content:"GET"; http_method; content:"INSERT"; nocase; content:"INTO"; nocase; distance:0; within:30; classtype:web-application-attack; sid:1000105; rev:2; metadata: description "INSERT injection for unauthorized data creation.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"SQL-INJECTION: Data Modification Attack - UPDATE Statement"; flow:to_server,established; content:"GET"; http_method; content:"UPDATE"; nocase; content:"SET"; nocase; distance:0; within:30; classtype:web-application-attack; sid:1000106; rev:2; metadata: description "SQL UPDATE injection for unauthorized data modification.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"SQL-INJECTION: Stored Procedure Execution - EXEC/EXECUTE"; flow:to_server,established; content:"GET"; http_method; pcre:"/EXEC(UTE)?\s*\(/i"; classtype:web-application-attack; sid:1000107; rev:2; metadata: description "SQL injection triggering stored procedure execution.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"SQL-INJECTION: Comment Bypass - Query Termination"; flow:to_server,established; content:"GET"; http_method; content:"--|"; nocase; classtype:web-application-attack; sid:1000108; rev:2; metadata: description "SQL comment syntax used to bypass query restrictions.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"SQL-INJECTION: Stacked Queries - Batch Command Execution"; flow:to_server,established; content:"GET"; http_method; pcre:"/;(DROP|DELETE|UPDATE|INSERT)/i"; classtype:web-application-attack; sid:1000109; rev:2; metadata: description "Stacked query injection executing multiple SQL statements.";)
+
+# =============================================================================
+# COMMAND INJECTION & RCE ATTACKS (1000200-1000299)
+# Attempts to inject system commands for arbitrary code execution
+# =============================================================================
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"RCE: Command Injection via Pipe Operator"; flow:to_server,established; content:"GET"; http_method; pcre:"/(\?|&)(cmd|command|exec|run)=.*\|/i"; classtype:web-application-attack; sid:1000200; rev:2; metadata: description "Pipe operator (|) used for command chaining injection.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"RCE: Command Injection via Backticks - Shell Metacharacter"; flow:to_server,established; content:"GET"; http_method; content:"`"; pcre:"/`[^`]*`/"; classtype:web-application-attack; sid:1000201; rev:2; metadata: description "Backtick shell command substitution for code execution.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"RCE: Command Injection via Command Substitution $()"; flow:to_server,established; content:"GET"; http_method; pcre:"/\$\([^\)]+\)/"; classtype:web-application-attack; sid:1000202; rev:2; metadata: description "$() command substitution syntax for arbitrary code execution.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"RCE: OS Command Injection - Shell Invocation /bin/bash"; flow:to_server,established; content:"GET"; http_method; content:"/bin/bash"; nocase; classtype:web-application-attack; sid:1000203; rev:2; metadata: description "Direct bash shell invocation indicating command injection payload.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"RCE: OS Command Injection - Shell Invocation /bin/sh"; flow:to_server,established; content:"GET"; http_method; content:"/bin/sh"; nocase; classtype:web-application-attack; sid:1000204; rev:2; metadata: description "Direct sh shell invocation for arbitrary command execution.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"RCE: PHP Remote Code Execution - eval() Function"; flow:to_server,established; content:"POST"; http_method; pcre:"/(eval|assert|create_function)\s*\(/i"; classtype:web-application-attack; sid:1000205; rev:2; metadata: description "PHP eval()/assert() function abuse for code execution.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"RCE: PHP Code Execution - system() Function"; flow:to_server,established; content:"GET"; http_method; pcre:"/system\s*\(['\"]?[^)]*['\"]?\)/i"; classtype:web-application-attack; sid:1000206; rev:2; metadata: description "PHP system() function for OS command execution.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"RCE: PHP Code Execution - passthru() Function"; flow:to_server,established; content:"GET"; http_method; pcre:"/passthru\s*\(/i"; classtype:web-application-attack; sid:1000207; rev:2; metadata: description "PHP passthru() function for direct command output.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"RCE: PHP Code Execution - exec() Function"; flow:to_server,established; content:"GET"; http_method; pcre:"/exec\s*\(['\"]?[^)]*['\"]?\)/i"; classtype:web-application-attack; sid:1000208; rev:2; metadata: description "PHP exec() function for background command execution.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"RCE: PHP Code Execution - shell_exec() Function"; flow:to_server,established; content:"GET"; http_method; pcre:"/shell_exec\s*\(/i"; classtype:web-application-attack; sid:1000209; rev:2; metadata: description "PHP shell_exec() function for shell command execution.";)
+
+# =============================================================================
 # AUTHENTICATION & CREDENTIAL ATTACKS (1000300-1000399)
-# ============================================================================
+# Attacks targeting user authentication and credential systems
+# =============================================================================
 
-alert tcp $EXTERNAL_NET any -> $HOME_NET 389 (msg:"LDAP Brute Force Attempt"; flow:to_server,established; threshold:type both, track by_src, count 20, seconds 60; classtype:attempted-user; sid:1000300; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 636 (msg:"LDAPS Brute Force Attempt"; flow:to_server,established; threshold:type both, track by_src, count 20, seconds 60; classtype:attempted-user; sid:1000301; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET POLICY Authentication Bypass - No Password"; flow:to_server,established; content:"GET"; http_method; content:"pass="; nocase; classtype:attempted-user; sid:1000302; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Login Brute Force - Admin"; flow:to_server,established; content:"POST"; http_method; content:"admin"; nocase; content:"password"; nocase; threshold:type both, track by_src, count 10, seconds 60; classtype:attempted-user; sid:1000303; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 22 (msg:"SSH Authentication Failure - Multiple Attempts"; flow:to_server,established; threshold:type both, track by_src, count 5, seconds 60; classtype:attempted-user; sid:1000304; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Credential Stuffing - Common Admin Paths"; flow:to_server,established; content:"POST"; http_method; content:"/admin"; classtype:attempted-user; sid:1000305; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Weak Password Detection"; flow:to_server,established; content:"password=123456"; nocase; classtype:attempted-user; sid:1000306; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK Default Credential - Tomcat"; flow:to_server,established; content:"tomcat"; nocase; classtype:attempted-user; sid:1000307; rev:1;)
-alert tcp $EXTERNAL_NET any -> $HOME_NET 445 (msg:"SMB Brute Force Attempt"; flow:to_server,established; threshold:type both, track by_src, count 20, seconds 60; classtype:attempted-user; sid:1000308; rev:1;)
-alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET ATTACK OAuth/JWT Token Manipulation"; flow:to_server,established; content:"GET"; http_method; content:"Bearer "; classtype:attempted-user; sid:1000309; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 389 (msg:"AUTH-ATTACK: LDAP Brute Force - Multiple Failed Binds"; flow:to_server,established; threshold:type both, track by_src, count 20, seconds 60; classtype:attempted-user; sid:1000300; rev:2; metadata: description "Multiple LDAP bind attempts from single source indicating credential attack.";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 636 (msg:"AUTH-ATTACK: LDAPS Brute Force - Encrypted Credential Testing"; flow:to_server,established; threshold:type both, track by_src, count 20, seconds 60; classtype:attempted-user; sid:1000301; rev:2; metadata: description "Multiple LDAPS (secure LDAP) connection attempts - encrypted brute force.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"AUTH-ATTACK: Authentication Bypass - Empty Credentials"; flow:to_server,established; content:"POST"; http_method; pcre:"/password\s*=\s*(&|$)/i"; classtype:attempted-user; sid:1000302; rev:2; metadata: description "Attempt to authenticate with missing/empty password field.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"AUTH-ATTACK: HTTP Login Brute Force - Admin Panel"; flow:to_server,established; content:"POST"; http_method; content:"/admin"; content:"username"; content:"password"; threshold:type both, track by_src, count 10, seconds 60; classtype:attempted-user; sid:1000303; rev:2; metadata: description "Rapid login attempts to admin panel with multiple credentials.";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 22 (msg:"AUTH-ATTACK: SSH Brute Force - Multiple Failed Logins"; flow:to_server,established; threshold:type both, track by_src, count 5, seconds 60; classtype:attempted-user; sid:1000304; rev:2; metadata: description "Multiple SSH authentication attempts from external source.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"AUTH-ATTACK: Credential Stuffing - Common Admin Paths"; flow:to_server,established; content:"POST"; http_method; pcre:"/\/admin|\/administrator|\/login|\/signin/i"; threshold:type both, track by_src, count 10, seconds 60; classtype:attempted-user; sid:1000305; rev:2; metadata: description "High-volume login attempts to administrative interfaces.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"AUTH-ATTACK: Weak Password Submission - Common Patterns"; flow:to_server,established; content:"POST"; http_method; pcre:"/password\s*=\s*(123456|password|admin|letmein|welcome)/i"; classtype:attempted-user; sid:1000306; rev:2; metadata: description "Submission of weak/common passwords in authentication attempt.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"AUTH-ATTACK: Default Credential - Tomcat Manager"; flow:to_server,established; pcre:"/(tomcat|admin):tomcat/i"; classtype:attempted-user; sid:1000307; rev:2; metadata: description "Tomcat manager default credentials (tomcat:tomcat) detection.";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET 445 (msg:"AUTH-ATTACK: SMB Brute Force - Windows Authentication"; flow:to_server,established; threshold:type both, track by_src, count 20, seconds 60; classtype:attempted-user; sid:1000308; rev:2; metadata: description "Multiple SMB authentication attempts targeting Windows systems.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"AUTH-ATTACK: JWT/OAuth Token Tampering"; flow:to_server,established; pcre:"/Authorization\s*:\s*Bearer\s+[a-zA-Z0-9\.\-_]+/i"; threshold:type both, track by_src, count 5, seconds 30; classtype:attempted-user; sid:1000309; rev:2; metadata: description "Suspicious JWT/OAuth token reuse or manipulation patterns.";)
 
 # ============================================================================
 # MALWARE & SUSPICIOUS TRAFFIC (1000400-1000499)
@@ -188,3 +239,55 @@ alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"Qualys Scanner Detected"; co
 alert tcp $HOME_NET any -> $HOME_NET any (msg:"Suspicious Process - Powershell Execution"; content:"powershell"; nocase; classtype:suspicious-activity; sid:1001008; rev:1;)
 alert tcp $HOME_NET any -> $HOME_NET any (msg:"Suspicious Process - CMD Execution"; content:"cmd.exe"; nocase; classtype:suspicious-activity; sid:1001009; rev:1;)
 alert tcp $HOME_NET any -> $HOME_NET any (msg:"Suspicious Process - Encoded Scripts"; content:"base64"; nocase; classtype:suspicious-activity; sid:1001010; rev:1;)
+
+# =============================================================================
+# ADVANCED ATTACK SCENARIOS (1001100-1001200)
+# Complex multi-stage attacks and lateral movement patterns
+# =============================================================================
+
+# Post-Exploitation and Persistence
+alert tcp $HOME_NET any -> $HOME_NET any (msg:"LATERAL-MOVE: Mimikatz Password Extraction Indicators"; content:"mimikatz"; nocase; classtype:attempted-admin; sid:1001100; rev:1; metadata: description "Mimikatz tool usage detected - credential theft framework.";)
+
+alert tcp $HOME_NET any -> $HOME_NET 445 (msg:"LATERAL-MOVE: Named Pipe Enumeration - Lateral Movement"; content:"\\"; content:"pipe"; nocase; classtype:attempted-admin; sid:1001101; rev:1; metadata: description "SMB named pipe access for lateral movement via PSEXEC.";)
+
+alert tcp $HOME_NET any -> $HOME_NET 21 (msg:"DATA-THEFT: FTP Anonymous Login Attempt"; content:"USER"; nocase; content:"anonymous"; nocase; classtype:suspicious-activity; sid:1001102; rev:1; metadata: description "Anonymous FTP authentication for unauthorized data access.";)
+
+# Web Application Exploitation
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"WEB-ATTACK: Path Traversal Exploitation - Directory Escape"; flow:to_server,established; content:"GET"; http_method; pcre:"/\.\.%2f|\.\.\/|\.\.\\{2,}/i"; classtype:web-application-attack; sid:1001103; rev:2; metadata: description "Path traversal patterns attempting to escape webroot.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"WEB-ATTACK: LFI Exploitation - /etc/passwd Access"; flow:to_server,established; content:"GET"; http_method; pcre:"/\/etc\/(passwd|shadow|hosts|hostname)/i"; classtype:web-application-attack; sid:1001104; rev:2; metadata: description "Local file inclusion attack targeting sensitive system files.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"WEB-ATTACK: RFI Exploitation - Remote Script Inclusion"; flow:to_server,established; content:"GET"; http_method; pcre:"/https?:\/\/[^\s]+\.(php|asp|jsp|py)/i"; classtype:web-application-attack; sid:1001105; rev:2; metadata: description "Remote file inclusion from external URLs in parameters.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"WEB-ATTACK: XXE Injection - XML External Entity"; flow:to_server,established; content:"POST"; http_method; pcre:"/<!ENTITY[^>]*SYSTEM\s+['\"](?:file|http):\/\//i"; classtype:web-application-attack; sid:1001106; rev:2; metadata: description "XXE attack attempting to include external entities/DTDs.";)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"WEB-ATTACK: Deserialization Attack - Java Object Gadget"; flow:to_server,established; content:"POST"; http_method; pcre:"/aced00(05|04).*?[Rr]untime.*?exec/i"; classtype:web-application-attack; sid:1001107; rev:2; metadata: description "Java deserialization gadget chain for RCE.";)
+
+# Network-Based Attacks
+alert tcp $EXTERNAL_NET any -> $HOME_NET 139 (msg:"NETWORK-ATTACK: NetBIOS Exploitation - System Enumeration"; threshold:type both, track by_src, count 10, seconds 60; classtype:attempted-recon; sid:1001108; rev:1; metadata: description "NetBIOS name queries for Windows system discovery.";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"NETWORK-ATTACK: Slow HTTP DoS - Slowloris Attack"; flow:to_server; content:"GET"; http_method; pcre:"/Keep-Alive:\s*\d{4,}/i"; threshold:type both, track by_src, count 100, seconds 300; classtype:denial-of-service; sid:1001109; rev:1; metadata: description "Slowloris slow HTTP attack holding connections open.";)
+
+alert udp $EXTERNAL_NET any -> $HOME_NET 5353 (msg:"NETWORK-ATTACK: mDNS Enumeration - Service Discovery"; threshold:type both, track by_src, count 20, seconds 60; classtype:attempted-recon; sid:1001110; rev:1; metadata: description "Multicast DNS queries for local service enumeration.";)
+
+# Encryption & Tunnel Detection
+alert tcp $HOME_NET any -> $EXTERNAL_NET !80 !443 (msg:"TUNNEL-DETECTION: Suspicious Encrypted Tunnel - Non-Standard Port"; flow:to_server,established; threshold:type both, track by_dst, count 50, seconds 60; classtype:suspicious-activity; sid:1001111; rev:1; metadata: description "Encrypted tunnel over non-standard port indicates potential C2.";)
+
+alert dns $HOME_NET any -> $EXTERNAL_NET 53 (msg:"TUNNEL-DETECTION: DNS Query Anomaly - Large Response"; dns_query; threshold:type both, track by_src, count 200, seconds 60; classtype:suspicious-activity; sid:1001112; rev:1; metadata: description "Excessive DNS queries potentially used for data exfiltration.";)
+
+# Ransomware Behavior Detection
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"RANSOMWARE: Suspicious File Encryption Patterns"; flow:to_server,established; pcre:"/\.encrypted|\.locked|\.crypted|\.ransom|\.wannacry/i"; classtype:trojan-activity; sid:1001113; rev:1; metadata: description "File extensions associated with ransomware encryption.";)
+
+alert tcp $HOME_NET any -> $EXTERNAL_NET 25 (msg:"RANSOMWARE: Payment Demand Email Transmission"; flow:to_server,established; content:"MAIL"; nocase; threshold:type both, track by_src, count 5, seconds 60; classtype:trojan-activity; sid:1001114; rev:1; metadata: description "SMTP transmission of ransom demands/payment instructions.";)
+
+# Advanced Persistent Threat Detection
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"APT: Command & Control Beacon - Regular Callback"; flow:to_server,established; threshold:type both, track by_dst, count 20, seconds 300; classtype:trojan-activity; sid:1001115; rev:1; metadata: description "Regular outbound connections to external C2 server.";)
+
+alert tcp $HOME_NET any -> $EXTERNAL_NET 443 (msg:"APT: HTTPS-Based C2 Communication - Suspicious TLS"; flow:to_server,established; content:"TLS"; pcre:"/[Ss]uspicious|[Rr]everse[Ss]hell|[Bb]eacon/i"; classtype:trojan-activity; sid:1001116; rev:1; metadata: description "HTTPS C2 traffic patterns indicative of APT activity.";)
+
+# Zero-Day and Anomaly Detection
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"ZERO-DAY: Shellcode Injection Pattern - NOP Sled"; flow:to_server; content:"|90 90 90 90|"; classtype:shellcode-detect; sid:1001117; rev:1; metadata: description "NOP sled pattern indicating potential shellcode injection.";)
+
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"ZERO-DAY: Heap Spray Attack Signature"; flow:to_server; content:"HEAP"; nocase; threshold:type both, track by_src, count 5, seconds 60; classtype:shellcode-detect; sid:1001118; rev:1; metadata: description "Heap spray pattern for memory corruption exploitation.";)
+
+alert ip $EXTERNAL_NET any -> $HOME_NET any (msg:"ANOMALY: Fragmented Packet Reassembly - Evasion Attempt"; flags:M; threshold:type both, track by_src, count 100, seconds 60; classtype:suspicious-activity; sid:1001119; rev:1; metadata: description "Excessive IP fragmentation potentially bypassing IDS detection.";)

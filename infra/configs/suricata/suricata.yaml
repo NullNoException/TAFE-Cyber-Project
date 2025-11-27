@@ -1,11 +1,27 @@
 %YAML 1.1
 ---
 
-# Suricata configuration file
-# Mode: IDS/IPS with packet capture and monitoring
+# =============================================================================
+# Suricata Configuration File - CyberLab Infrastructure
+# Mode: IDS/IPS with Wazuh Integration
+# Purpose: Network intrusion detection and prevention with comprehensive logging
+# =============================================================================
 
 # Engine configuration
 engine-analysis-stats: yes
+
+# Threading configuration for performance
+threading:
+  set-cpu-affinity: no
+  cpu-affinity:
+    - management-cpu-set:
+        cpu: [0]
+    - receive-cpu-set:
+        cpu: [1]
+    - worker-cpu-set:
+        cpu: ["2,3"]
+  detection-cpu-set:
+    - cpu: [1,2,3]
 
 vars:
   address-groups:
@@ -26,72 +42,181 @@ vars:
     ENIP_SERVER: "$HOME_NET"
 
   port-groups:
-    HTTP_PORTS: "80"
+    HTTP_PORTS: "80,8080,8000,8888"
+    HTTPS_PORTS: "443,8443"
     SHELLCODE_PORTS: "!80"
     ORACLE_PORTS: 1521
-    SSH_PORTS: 22
+    SSH_PORTS: "22,2222"
     DNP3_PORTS: 20000
     MODBUS_PORTS: 502
     FILE_DATA_PORTS: "[$HTTP_PORTS,110,143]"
-    FTP_PORTS: 21
+    FTP_PORTS: "21,989,990"
     GENEVE_PORTS: 6081
+    LDAP_PORTS: "389,636"
 
+# Logging configuration
 default-log-dir: /var/log/suricata
 
+# Output configurations - Wazuh integration via eve-log (JSON format)
 outputs:
+  # Fast Alert Log for quick parsing
   - fast:
       enabled: yes
       filename: fast.log
       append: yes
 
+  # Syslog output for Wazuh integration
   - syslog:
       enabled: yes
       facility: local5
       format: "[%i] <%d> -- %s"
       identity: "suricata"
 
+  # EVE JSON output - Primary format for Wazuh integration
   - eve-log:
       enabled: yes
       filetype: regular
       filename: eve.json
+      append: yes
       types:
-        - alert
-        - http
-        - dns
-        - tls
+        - alert:
+            # Include application information for better threat detection
+            payload: no
+            payload-printable: no
+            http-body: no
+            http-body-printable: no
+        - http:
+            extended: yes
+        - dns:
+            # DNS queries with extended information
+            version: 2
+        - tls:
+            # TLS handshake logging
+            extended: yes
         - smtp
         - ssh
         - stats
-        - flow
-        - anomaly
+        - flow:
+            extended: yes
+        - anomaly:
+            types:
+              - gre
+              - ipv4-invalid-option
+              - ipv4-unknown-protocol
+              - icmpv4-unknown-type
+              - icmpv6-unknown-type
+              - icmpv6-unknown-code
 
+  # HTTP detailed logging
   - http-log:
       enabled: yes
       filename: http.log
       append: yes
+      extended: yes
 
+  # File extraction (disabled by default for performance)
   - file-store:
       enabled: no
 
+# Application Layer Protocol Detection
 app-layer:
   protocols:
+    tls:
+      enabled: yes
+    http:
+      enabled: yes
+    ftp:
+      enabled: yes
+    ssh:
+      enabled: yes
+    smtp:
+      enabled: yes
     dnp3:
       enabled: yes
     modbus:
       enabled: yes
     enip:
       enabled: yes
+    http2:
+      enabled: yes
+    mqtt:
+      enabled: yes
 
+# Network interface configuration for packet capture
 af-packet:
-  - interface: eth0
+  - interface: eth1
     cluster-id: 99
     cluster-type: cluster_flow
     defrag: yes
+    use-mmap: yes
+    mmap-locked: no
+    tpacket-v3: yes
+    use-emergency-flush: yes
+    buffer-size: 32768
 
-default-rule-path: /var/lib/suricata/rules
+# Rule configuration
+default-rule-path: /var/lib/suricata
 rule-files:
   - suricata.rules
-  - suricata-rules.rules
 
-classification-file: /etc/suricata/classification.config
+# Traffic pattern detection
+detect:
+  profile: medium
+  toclient-groups: 3
+  toserver-groups: 3
+
+# Stream processing for stateful inspection
+stream:
+  enabled: yes
+  checksum-validation: yes
+  reassembly:
+    enabled: yes
+    depth: 0
+    toserver-chunk-size: 2560
+    toclient-chunk-size: 2560
+
+# Flow configuration for tracking connections
+flow:
+  hash-size: 65536
+  prealloc: 10000
+  emergency-bucket-count: 100
+
+# Packet loss handling
+packet:
+  snaplen: 65535
+
+# File data extraction (HTTP bodies, etc.)
+file-data-depth: 0
+
+# Logging paths
+classifications-file: /etc/suricata/classification.config
 reference-config-file: /etc/suricata/reference.config
+
+# Performance tuning
+performance-stats:
+  enabled: yes
+  interval: 8
+  classifier-period: 8
+  rule-period: 8
+  decoder-events: yes
+  decoder-period: 8
+
+# Provide guidance on anomalies
+anomaly:
+  enabled: yes
+  types:
+    ipv4:
+      bad-ihl: message
+      bad-version: message
+      icmpv4:
+        conflict-flags: alert
+        defrags-conflicting-data: alert
+    ipv6:
+      exthdr:
+        invalid-optlen: alert
+      icmpv6:
+        defrags-conflicting-data: alert
+
+# GeoIP database (optional, for enrichment)
+geoip:
+  enabled: no
