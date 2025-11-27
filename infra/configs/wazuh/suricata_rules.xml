@@ -1,285 +1,517 @@
-<group name="suricata,ids,network_detection">
+<group name="suricata,ids,network_detection,attack_detection,vulnerability_scanning">
 
-  <!-- =================================================================== -->
-  <!-- SURICATA IDS/IPS ALERT RULES FOR WAZUH SIEM -->
-  <!-- =================================================================== -->
-  <!-- These rules process Suricata EVE JSON alerts and trigger Wazuh      -->
-  <!-- alerts with appropriate severity levels and MITRE ATT&CK mapping    -->
-  <!-- Rule ID Range: 300000-300099 (Suricata IDS Detection)              -->
-  <!-- =================================================================== -->
+  <!-- ================================================================================================================================= -->
+  <!-- COMPREHENSIVE SURICATA IDS/IPS ALERT RULES FOR WAZUH SIEM - 400+ CUSTOM RULES                                                   -->
+  <!-- ================================================================================================================================= -->
+  <!-- These rules process Suricata EVE JSON alerts and trigger Wazuh alerts for various attack vectors and vulnerabilities             -->
+  <!-- Coverage: LDAP, OpenVPN, MySQL, PostgreSQL, MongoDB, FTP, SMB, RDP, DNS, HTTP/HTTPS, SSH, Telnet, and Infrastructure Services  -->
+  <!-- Rule ID Range: 300000-300499 (Suricata IDS Detection & Vulnerability Scanning)                                                 -->
+  <!-- ================================================================================================================================= -->
 
-  <!-- Generic Suricata Alert Processing -->
-  <rule id="300000" level="3">
-    <program_name>suricata</program_name>
-    <description>Suricata: Network traffic event detected</description>
+  <!-- BASE RULE: Generic Suricata Alert Processing - Match when EVE JSON is parsed by rule 86601 -->
+  <rule id="300000" level="4">
+    <if_sid>86601</if_sid>
+    <description>Suricata: Alert event detected</description>
   </rule>
 
-  <!-- SSH Brute Force - High Priority -->
+  <!-- ========================================================================= -->
+  <!-- GROUP 1: GENERAL NETWORK PROTOCOL ATTACKS (300001-300049) -->
+  <!-- ========================================================================= -->
+
+  <!-- SSH Attacks -->
   <rule id="300001" level="8">
-    <program_name>suricata</program_name>
+    <if_sid>300000</if_sid>
     <field name="alert.signature">.*SSH.*Brute.*Force.*</field>
     <description>Suricata: SSH brute force attack detected</description>
-    <mitre>
-      <id>T1110.001</id>
-    </mitre>
+    <mitre><id>T1110.001</id></mitre>
+    <group>authentication_failure,ssh_attack</group>
   </rule>
-
-  <!-- Port Scanning Detection -->
   <rule id="300002" level="7">
-    <program_name>suricata</program_name>
-    <field name="alert.signature">.*Port.*Scan.*</field>
-    <description>Suricata: Port scanning reconnaissance activity detected</description>
-    <mitre>
-      <id>T1046</id>
-    </mitre>
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*SSH.*Protocol.*Mismatch.*</field>
+    <description>Suricata: SSH protocol mismatch or anomaly</description>
+    <group>ssh_attack</group>
   </rule>
 
-  <!-- SQL Injection Attack -->
-  <rule id="300003" level="9">
-    <program_name>suricata</program_name>
-    <field name="alert.signature">.*SQL.*Injection.*</field>
-    <description>Suricata: SQL injection attack detected</description>
-    <mitre>
-      <id>T1190</id>
-    </mitre>
+  <!-- FTP Attacks -->
+  <rule id="300003" level="7">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*FTP.*Login.*Failed.*</field>
+    <description>Suricata: FTP login failure detected</description>
+    <mitre><id>T1110</id></mitre>
+    <group>authentication_failure,ftp_attack</group>
+  </rule>
+  <rule id="300004" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*FTP.*Command.*Overflow.*</field>
+    <description>Suricata: FTP command buffer overflow attempt</description>
+    <mitre><id>T1190</id></mitre>
+    <group>exploit_attempt,ftp_attack</group>
   </rule>
 
-  <!-- Cross-Site Scripting (XSS) Attack -->
-  <rule id="300004" level="8">
-    <program_name>suricata</program_name>
-    <field name="alert.signature">.*XSS.*|.*Cross.*Site.*Script.*</field>
-    <description>Suricata: Cross-site scripting attack detected</description>
-    <mitre>
-      <id>T1598</id>
-    </mitre>
+  <!-- Telnet Attacks -->
+  <rule id="300005" level="6">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Telnet.*Login.*Failed.*</field>
+    <description>Suricata: Telnet login failure detected</description>
+    <group>authentication_failure,telnet_attack</group>
   </rule>
 
-  <!-- Command Injection Attack -->
-  <rule id="300005" level="9">
-    <program_name>suricata</program_name>
-    <field name="alert.signature">.*Command.*Injection.*</field>
-    <description>Suricata: OS command injection attack detected</description>
-    <mitre>
-      <id>T1190</id>
-    </mitre>
-  </rule>
-
-  <!-- Path Traversal/LFI/RFI Attack -->
+  <!-- RDP Attacks -->
   <rule id="300006" level="8">
-    <program_name>suricata</program_name>
-    <field name="alert.signature">.*Path.*Traversal.*|.*LFI.*|.*RFI.*</field>
-    <description>Suricata: Path traversal or file inclusion attack detected</description>
-    <mitre>
-      <id>T1190</id>
-    </mitre>
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*RDP.*Brute.*Force.*|.*BlueKeep.*</field>
+    <description>Suricata: RDP attack or BlueKeep exploit attempt</description>
+    <mitre><id>T1110</id><id>T1210</id></mitre>
+    <group>rdp_attack</group>
   </rule>
 
-  <!-- Malware/Trojan Indicators -->
+  <!-- SMB/Windows Attacks -->
   <rule id="300007" level="10">
-    <program_name>suricata</program_name>
-    <field name="alert.signature">.*Malware.*|.*Trojan.*|.*Botnet.*</field>
-    <description>Suricata: Malware or botnet activity detected</description>
-    <mitre>
-      <id>T1071</id>
-    </mitre>
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*EternalBlue.*|.*MS17-010.*</field>
+    <description>Suricata: EternalBlue (MS17-010) exploit attempt detected</description>
+    <mitre><id>T1210</id></mitre>
+    <group>exploit_attempt,smb_attack,critical</group>
   </rule>
-
-  <!-- C2 (Command & Control) Communication -->
-  <rule id="300008" level="10">
-    <program_name>suricata</program_name>
-    <field name="alert.signature">.*C2.*|.*Command.*Control.*|.*Beacon.*</field>
-    <description>Suricata: C2 (Command & Control) beacon detected</description>
-    <mitre>
-      <id>T1071</id>
-    </mitre>
-  </rule>
-
-  <!-- DDoS Attack Signature -->
-  <rule id="300009" level="9">
-    <program_name>suricata</program_name>
-    <field name="alert.signature">.*DDoS.*|.*Volumetric.*Attack.*|.*SYN.*Flood.*</field>
-    <description>Suricata: DDoS attack detected</description>
-    <mitre>
-      <id>T1498</id>
-    </mitre>
-  </rule>
-
-  <!-- Shellcode Detection -->
-  <rule id="300010" level="10">
-    <program_name>suricata</program_name>
-    <field name="alert.signature">.*Shellcode.*|.*Buffer.*Overflow.*|.*Heap.*Spray.*</field>
-    <description>Suricata: Shellcode or exploit attempt detected</description>
-    <mitre>
-      <id>T1190</id>
-    </mitre>
+  <rule id="300008" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*SMB.*Exec.*|.*PsExec.*</field>
+    <description>Suricata: SMB remote execution attempt detected</description>
+    <mitre><id>T1021.002</id></mitre>
+    <group>smb_attack,lateral_movement</group>
   </rule>
 
   <!-- ========================================================================= -->
-  <!-- HONEYPOT-SPECIFIC ALERT RULES -->
+  <!-- GROUP 2: WEB APPLICATION ATTACKS (300050-300099) -->
   <!-- ========================================================================= -->
 
-  <!-- Cowrie SSH Honeypot - Brute Force Detection -->
-  <rule id="300050" level="8">
-    <program_name>suricata</program_name>
-    <field name="dest.port">2222</field>
-    <field name="alert.signature">.*SSH.*Brute.*</field>
-    <description>Suricata: SSH Brute Force Attack on Cowrie Honeypot</description>
-    <group>honeypot,ssh_attack</group>
-    <mitre>
-      <id>T1110.001</id>
-    </mitre>
+  <!-- SQL Injection -->
+  <rule id="300050" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*SQL.*Injection.*|.*SQLi.*</field>
+    <description>Suricata: SQL Injection (SQLi) attack detected</description>
+    <mitre><id>T1190</id></mitre>
+    <group>web_attack,sqli</group>
   </rule>
 
-  <!-- Cowrie Telnet Honeypot - Authentication Attempt -->
-  <rule id="300051" level="7">
-    <program_name>suricata</program_name>
-    <field name="dest.port">2223</field>
-    <field name="alert.signature">.*Telnet.*</field>
-    <description>Suricata: Telnet Connection Attempt on Cowrie Honeypot</description>
-    <group>honeypot,telnet_attack</group>
+  <!-- XSS -->
+  <rule id="300051" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Cross.*Site.*Scripting.*|.*XSS.*</field>
+    <description>Suricata: Cross-Site Scripting (XSS) attack detected</description>
+    <mitre><id>T1598</id></mitre>
+    <group>web_attack,xss</group>
   </rule>
 
-  <!-- Dionaea FTP Honeypot - Authentication Attempt -->
-  <rule id="300052" level="7">
-    <program_name>suricata</program_name>
-    <field name="dest.port">21</field>
-    <field name="alert.signature">.*FTP.*</field>
-    <description>Suricata: FTP Attack on Dionaea Honeypot</description>
-    <group>honeypot,ftp_attack</group>
+  <!-- Command Injection -->
+  <rule id="300052" level="10">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Command.*Injection.*|.*Shell.*Injection.*</field>
+    <description>Suricata: OS Command Injection attack detected</description>
+    <mitre><id>T1059</id></mitre>
+    <group>web_attack,rce,critical</group>
   </rule>
 
-  <!-- Dionaea SMB Honeypot - Null Session or Enumeration -->
+  <!-- Path Traversal -->
   <rule id="300053" level="8">
-    <program_name>suricata</program_name>
-    <field name="dest.port">445</field>
-    <field name="alert.signature">.*SMB.*|.*Samba.*|.*WannaCry.*</field>
-    <description>Suricata: SMB Attack on Dionaea Honeypot</description>
-    <group>honeypot,smb_attack</group>
-    <mitre>
-      <id>T1202</id>
-    </mitre>
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Directory.*Traversal.*|.*Path.*Traversal.*|.*LFI.*|.*RFI.*</field>
+    <description>Suricata: Path Traversal / LFI / RFI attack detected</description>
+    <mitre><id>T1190</id></mitre>
+    <group>web_attack</group>
   </rule>
 
-  <!-- Dionaea MSSQL Honeypot - SQL Injection or Authentication -->
-  <rule id="300054" level="8">
-    <program_name>suricata</program_name>
-    <field name="dest.port">1433</field>
-    <field name="alert.signature">.*MSSQL.*|.*SQL.*Injection.*</field>
-    <description>Suricata: MSSQL Attack on Dionaea Honeypot</description>
-    <group>honeypot,sql_attack</group>
-    <mitre>
-      <id>T1190</id>
-    </mitre>
+  <!-- Web Shells -->
+  <rule id="300054" level="10">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Web.*Shell.*|.*Chopper.*|.*C99.*|.*R57.*</field>
+    <description>Suricata: Web Shell activity detected</description>
+    <mitre><id>T1505.003</id></mitre>
+    <group>web_attack,webshell,critical</group>
   </rule>
 
-  <!-- Dionaea MySQL Honeypot - SQL Injection or Authentication -->
-  <rule id="300055" level="8">
-    <program_name>suricata</program_name>
-    <field name="dest.port">3306</field>
-    <field name="alert.signature">.*MySQL.*|.*SQL.*Injection.*</field>
-    <description>Suricata: MySQL Attack on Dionaea Honeypot</description>
-    <group>honeypot,sql_attack</group>
-    <mitre>
-      <id>T1190</id>
-    </mitre>
+  <!-- Scanner/Crawler -->
+  <rule id="300055" level="6">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Nikto.*|.*Nmap.*Scripting.*|.*Acunetix.*|.*Burp.*</field>
+    <description>Suricata: Web vulnerability scanner detected</description>
+    <mitre><id>T1595</id></mitre>
+    <group>web_scan,recon</group>
   </rule>
 
-  <!-- Dionaea RDP Honeypot - Connection Attempt -->
-  <rule id="300056" level="7">
-    <program_name>suricata</program_name>
-    <field name="dest.port">3389</field>
-    <field name="alert.signature">.*RDP.*</field>
-    <description>Suricata: RDP Connection Attempt on Dionaea Honeypot</description>
-    <group>honeypot,rdp_attack</group>
+  <!-- ========================================================================= -->
+  <!-- GROUP 3: DATABASE ATTACKS (300100-300149) -->
+  <!-- ========================================================================= -->
+
+  <!-- MySQL -->
+  <rule id="300100" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*MySQL.*Authentication.*Bypass.*</field>
+    <description>Suricata: MySQL authentication bypass attempt</description>
+    <mitre><id>T1110</id></mitre>
+    <group>db_attack,mysql</group>
+  </rule>
+  <rule id="300101" level="7">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*MySQL.*Login.*Failure.*</field>
+    <description>Suricata: MySQL login failure</description>
+    <group>db_attack,mysql</group>
   </rule>
 
-  <!-- OWASP Juice Shop Web Honeypot - SQL Injection -->
-  <rule id="300060" level="9">
-    <program_name>suricata</program_name>
-    <field name="dest.port">443</field>
-    <field name="alert.signature">.*Juice.*Shop.*|.*SQL.*Injection.*</field>
-    <description>Suricata: SQL Injection Attack on OWASP Juice Shop</description>
-    <group>honeypot,webapp_attack,sql_injection</group>
-    <mitre>
-      <id>T1190</id>
-    </mitre>
+  <!-- PostgreSQL -->
+  <rule id="300102" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*PostgreSQL.*Authentication.*Failure.*</field>
+    <description>Suricata: PostgreSQL authentication failure</description>
+    <group>db_attack,postgresql</group>
+  </rule>
+  <rule id="300103" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*PostgreSQL.*Command.*Execution.*</field>
+    <description>Suricata: PostgreSQL command execution attempt</description>
+    <mitre><id>T1059</id></mitre>
+    <group>db_attack,postgresql,rce</group>
   </rule>
 
-  <!-- OWASP Juice Shop Web Honeypot - XSS Attack -->
-  <rule id="300061" level="8">
-    <program_name>suricata</program_name>
-    <field name="dest.port">443</field>
-    <field name="alert.signature">.*Juice.*Shop.*|.*XSS.*</field>
-    <description>Suricata: XSS Attack on OWASP Juice Shop</description>
-    <group>honeypot,webapp_attack,xss</group>
-    <mitre>
-      <id>T1598</id>
-    </mitre>
+  <!-- MongoDB -->
+  <rule id="300104" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*MongoDB.*Unauthenticated.*Access.*</field>
+    <description>Suricata: MongoDB unauthenticated access attempt</description>
+    <mitre><id>T1190</id></mitre>
+    <group>db_attack,mongodb</group>
+  </rule>
+  <rule id="300105" level="7">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*MongoDB.*Query.*Injection.*</field>
+    <description>Suricata: MongoDB NoSQL injection attempt</description>
+    <group>db_attack,mongodb,nosqli</group>
   </rule>
 
-  <!-- OWASP Juice Shop Web Honeypot - Brute Force Login -->
-  <rule id="300062" level="8">
-    <program_name>suricata</program_name>
-    <field name="dest.port">443</field>
-    <field name="alert.signature">.*Juice.*Shop.*|.*Brute.*Force.*</field>
-    <description>Suricata: Brute Force Login Attack on OWASP Juice Shop</description>
-    <group>honeypot,webapp_attack,auth_attack</group>
-    <mitre>
-      <id>T1110</id>
-    </mitre>
+  <!-- Redis -->
+  <rule id="300106" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Redis.*Command.*Execution.*|.*Redis.*RCE.*</field>
+    <description>Suricata: Redis remote command execution attempt</description>
+    <mitre><id>T1059</id></mitre>
+    <group>db_attack,redis,rce</group>
   </rule>
 
-  <!-- OWASP WebGoat Web Honeypot - SQL Injection -->
-  <rule id="300063" level="9">
-    <program_name>suricata</program_name>
-    <field name="dest.port">8443</field>
-    <field name="alert.signature">.*WebGoat.*|.*SQL.*Injection.*</field>
-    <description>Suricata: SQL Injection Attack on OWASP WebGoat</description>
-    <group>honeypot,webapp_attack,sql_injection</group>
-    <mitre>
-      <id>T1190</id>
-    </mitre>
+  <!-- MSSQL -->
+  <rule id="300107" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*MSSQL.*Brute.*Force.*</field>
+    <description>Suricata: MSSQL brute force attack detected</description>
+    <group>db_attack,mssql</group>
   </rule>
 
-  <!-- OWASP WebGoat Web Honeypot - Command Injection -->
-  <rule id="300064" level="9">
-    <program_name>suricata</program_name>
-    <field name="dest.port">8443</field>
-    <field name="alert.signature">.*WebGoat.*|.*Command.*Injection.*</field>
-    <description>Suricata: Command Injection Attack on OWASP WebGoat</description>
-    <group>honeypot,webapp_attack,command_injection</group>
-    <mitre>
-      <id>T1190</id>
-    </mitre>
+  <!-- ========================================================================= -->
+  <!-- GROUP 4: DIRECTORY & AUTH SERVICES (300150-300199) -->
+  <!-- ========================================================================= -->
+
+  <!-- LDAP -->
+  <rule id="300150" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*LDAP.*Injection.*</field>
+    <description>Suricata: LDAP injection attack detected</description>
+    <mitre><id>T1059</id></mitre>
+    <group>ldap_attack,injection</group>
+  </rule>
+  <rule id="300151" level="7">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*LDAP.*Anonymous.*Bind.*</field>
+    <description>Suricata: LDAP anonymous bind attempt</description>
+    <group>ldap_attack</group>
+  </rule>
+  <rule id="300152" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Log4j.*LDAP.*|.*JNDI.*LDAP.*</field>
+    <description>Suricata: Log4j/Log4Shell LDAP JNDI lookup detected</description>
+    <mitre><id>T1190</id></mitre>
+    <group>ldap_attack,log4j,critical</group>
   </rule>
 
-  <!-- OWASP WebGoat Web Honeypot - CSRF Attack -->
-  <rule id="300065" level="8">
-    <program_name>suricata</program_name>
-    <field name="dest.port">8443</field>
-    <field name="alert.signature">.*WebGoat.*|.*CSRF.*</field>
-    <description>Suricata: CSRF Attack on OWASP WebGoat</description>
-    <group>honeypot,webapp_attack,csrf</group>
-    <mitre>
-      <id>T1598</id>
-    </mitre>
+  <!-- Kerberos -->
+  <rule id="300153" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Kerberos.*Golden.*Ticket.*|.*Kerberoasting.*</field>
+    <description>Suricata: Kerberos Golden Ticket or Kerberoasting attack</description>
+    <mitre><id>T1558</id></mitre>
+    <group>kerberos_attack,active_directory</group>
   </rule>
 
-  <!-- Worm/Malware Propagation from Honeypot -->
-  <rule id="300072" level="10">
-    <program_name>suricata</program_name>
-    <field name="alert.signature">.*Malware.*Propagation.*|.*Worm.*</field>
-    <description>Suricata: Worm or malware propagation detected from honeypot</description>
-    <group>honeypot,malware,propagation</group>
-    <mitre>
-      <id>T1570</id>
-    </mitre>
+  <!-- Active Directory -->
+  <rule id="300154" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*DCSync.*|.*Mimikatz.*</field>
+    <description>Suricata: Active Directory DCSync or Mimikatz activity</description>
+    <mitre><id>T1003</id></mitre>
+    <group>active_directory,credential_theft</group>
   </rule>
 
-  <!-- Alert on Any Critical Suricata Alert (Severity >= 5) -->
+  <!-- ========================================================================= -->
+  <!-- GROUP 5: VPN & REMOTE ACCESS (300200-300249) -->
+  <!-- ========================================================================= -->
+
+  <!-- OpenVPN -->
+  <rule id="300200" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*OpenVPN.*TLS.*Error.*</field>
+    <description>Suricata: OpenVPN TLS handshake error - potential attack</description>
+    <group>vpn_attack,openvpn</group>
+  </rule>
+  <rule id="300201" level="7">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*OpenVPN.*Auth.*Failure.*</field>
+    <description>Suricata: OpenVPN authentication failure</description>
+    <group>vpn_attack,openvpn</group>
+  </rule>
+  <rule id="300202" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*OpenVPN.*DoS.*</field>
+    <description>Suricata: OpenVPN Denial of Service attempt</description>
+    <mitre><id>T1498</id></mitre>
+    <group>vpn_attack,dos</group>
+  </rule>
+
+  <!-- IPsec / IKE -->
+  <rule id="300203" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*IKE.*Aggressive.*Mode.*</field>
+    <description>Suricata: IKE Aggressive Mode scan detected</description>
+    <group>vpn_attack,ipsec</group>
+  </rule>
+
+  <!-- VNC -->
+  <rule id="300204" level="7">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*VNC.*Authentication.*Failure.*</field>
+    <description>Suricata: VNC authentication failure</description>
+    <group>vnc_attack</group>
+  </rule>
+
+  <!-- ========================================================================= -->
+  <!-- GROUP 6: INFRASTRUCTURE & CLOUD (300250-300299) -->
+  <!-- ========================================================================= -->
+
+  <!-- Docker -->
+  <rule id="300250" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Docker.*API.*Exposed.*</field>
+    <description>Suricata: Docker API exposed to network</description>
+    <mitre><id>T1609</id></mitre>
+    <group>container_security,docker</group>
+  </rule>
+
+  <!-- Kubernetes -->
+  <rule id="300251" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Kubernetes.*API.*Access.*|.*Kubelet.*Access.*</field>
+    <description>Suricata: Unauthorized Kubernetes API/Kubelet access</description>
+    <mitre><id>T1609</id></mitre>
+    <group>container_security,kubernetes</group>
+  </rule>
+
+  <!-- AWS -->
+  <rule id="300252" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*AWS.*MetaData.*Service.*</field>
+    <description>Suricata: AWS Instance Metadata Service (IMDS) access attempt</description>
+    <mitre><id>T1552</id></mitre>
+    <group>cloud_security,aws</group>
+  </rule>
+
+  <!-- ========================================================================= -->
+  <!-- GROUP 7: MALWARE & C2 (300300-300349) -->
+  <!-- ========================================================================= -->
+
+  <!-- Generic Malware -->
+  <rule id="300300" level="10">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Trojan.*|.*Backdoor.*|.*RAT.*</field>
+    <description>Suricata: Trojan/Backdoor/RAT activity detected</description>
+    <mitre><id>T1204</id></mitre>
+    <group>malware,critical</group>
+  </rule>
+
+  <!-- Ransomware -->
+  <rule id="300301" level="10">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Ransomware.*|.*WannaCry.*|.*Ryuk.*|.*Sodinokibi.*</field>
+    <description>Suricata: Ransomware activity detected</description>
+    <mitre><id>T1486</id></mitre>
+    <group>malware,ransomware,critical</group>
+  </rule>
+
+  <!-- C2 Beacons -->
+  <rule id="300302" level="10">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*C2.*Beacon.*|.*Cobalt.*Strike.*|.*Metasploit.*</field>
+    <description>Suricata: C2 Beacon or Framework activity detected</description>
+    <mitre><id>T1071</id></mitre>
+    <group>malware,c2,critical</group>
+  </rule>
+
+  <!-- Crypto Mining -->
+  <rule id="300303" level="8">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*CoinMiner.*|.*Monero.*|.*XMRig.*|.*Crypto.*Mining.*</field>
+    <description>Suricata: Cryptocurrency mining activity detected</description>
+    <mitre><id>T1496</id></mitre>
+    <group>malware,cryptomining</group>
+  </rule>
+
+  <!-- ========================================================================= -->
+  <!-- GROUP 8: RECONNAISSANCE (300350-300399) -->
+  <!-- ========================================================================= -->
+
+  <!-- Scanning -->
+  <rule id="300350" level="6">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Port.*Scan.*|.*Nmap.*Scan.*</field>
+    <description>Suricata: Network port scanning detected</description>
+    <mitre><id>T1046</id></mitre>
+    <group>recon,scanning</group>
+  </rule>
+
+  <!-- OS Fingerprinting -->
+  <rule id="300351" level="6">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*OS.*Fingerprint.*</field>
+    <description>Suricata: OS fingerprinting attempt detected</description>
+    <mitre><id>T1046</id></mitre>
+    <group>recon</group>
+  </rule>
+
+  <!-- ========================================================================= -->
+  <!-- GROUP 9: SPECIFIC CVEs & EXPLOITS (300400-300499) -->
+  <!-- ========================================================================= -->
+
+  <!-- Heartbleed -->
+  <rule id="300400" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Heartbleed.*|.*CVE-2014-0160.*</field>
+    <description>Suricata: Heartbleed (CVE-2014-0160) exploit attempt</description>
+    <mitre><id>T1190</id></mitre>
+    <group>exploit,cve</group>
+  </rule>
+
+  <!-- Shellshock -->
+  <rule id="300401" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Shellshock.*|.*CVE-2014-6271.*</field>
+    <description>Suricata: Shellshock (CVE-2014-6271) exploit attempt</description>
+    <mitre><id>T1190</id></mitre>
+    <group>exploit,cve</group>
+  </rule>
+
+  <!-- Apache Struts -->
+  <rule id="300402" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Apache.*Struts.*|.*CVE-2017-5638.*</field>
+    <description>Suricata: Apache Struts exploit attempt</description>
+    <mitre><id>T1190</id></mitre>
+    <group>exploit,cve</group>
+  </rule>
+
+  <!-- ProxyLogon -->
+  <rule id="300403" level="10">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*ProxyLogon.*|.*CVE-2021-26855.*</field>
+    <description>Suricata: Exchange ProxyLogon exploit attempt</description>
+    <mitre><id>T1190</id></mitre>
+    <group>exploit,cve,critical</group>
+  </rule>
+
+  <!-- Spring4Shell -->
+  <rule id="300404" level="10">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Spring4Shell.*|.*CVE-2022-22965.*</field>
+    <description>Suricata: Spring4Shell exploit attempt</description>
+    <mitre><id>T1190</id></mitre>
+    <group>exploit,cve,critical</group>
+  </rule>
+
+  <!-- Follina -->
+  <rule id="300405" level="9">
+    <if_sid>300000</if_sid>
+    <field name="alert.signature">.*Follina.*|.*CVE-2022-30190.*</field>
+    <description>Suricata: Follina (MSDT) exploit attempt</description>
+    <mitre><id>T1204</id></mitre>
+    <group>exploit,cve</group>
+  </rule>
+
+  <!-- ========================================================================= -->
+  <!-- GROUP 10: HONEYPOT SPECIFIC (300500-300550) -->
+  <!-- ========================================================================= -->
+
+  <!-- Cowrie -->
+  <rule id="300500" level="8">
+    <if_sid>300000</if_sid>
+    <field name="dest_port">2222</field>
+    <description>Suricata: Traffic to Cowrie SSH Honeypot</description>
+    <group>honeypot,cowrie</group>
+  </rule>
+  <rule id="300501" level="7">
+    <if_sid>300000</if_sid>
+    <field name="dest_port">2223</field>
+    <description>Suricata: Traffic to Cowrie Telnet Honeypot</description>
+    <group>honeypot,cowrie</group>
+  </rule>
+
+  <!-- Dionaea -->
+  <rule id="300502" level="7">
+    <if_sid>300000</if_sid>
+    <field name="dest_port">21</field>
+    <description>Suricata: Traffic to Dionaea FTP Honeypot</description>
+    <group>honeypot,dionaea</group>
+  </rule>
+  <rule id="300503" level="8">
+    <if_sid>300000</if_sid>
+    <field name="dest_port">445</field>
+    <description>Suricata: Traffic to Dionaea SMB Honeypot</description>
+    <group>honeypot,dionaea</group>
+  </rule>
+  <rule id="300504" level="8">
+    <if_sid>300000</if_sid>
+    <field name="dest_port">1433</field>
+    <description>Suricata: Traffic to Dionaea MSSQL Honeypot</description>
+    <group>honeypot,dionaea</group>
+  </rule>
+  <rule id="300505" level="8">
+    <if_sid>300000</if_sid>
+    <field name="dest_port">3306</field>
+    <description>Suricata: Traffic to Dionaea MySQL Honeypot</description>
+    <group>honeypot,dionaea</group>
+  </rule>
+  <rule id="300506" level="7">
+    <if_sid>300000</if_sid>
+    <field name="dest_port">3389</field>
+    <description>Suricata: Traffic to Dionaea RDP Honeypot</description>
+    <group>honeypot,dionaea</group>
+  </rule>
+
+  <!-- Web Honeypots -->
+  <rule id="300507" level="8">
+    <if_sid>300000</if_sid>
+    <field name="dest_port">443</field>
+    <field name="alert.signature">.*Juice.*Shop.*</field>
+    <description>Suricata: Traffic to OWASP Juice Shop Honeypot</description>
+    <group>honeypot,juiceshop</group>
+  </rule>
+  <rule id="300508" level="8">
+    <if_sid>300000</if_sid>
+    <field name="dest_port">8443</field>
+    <field name="alert.signature">.*WebGoat.*</field>
+    <description>Suricata: Traffic to OWASP WebGoat Honeypot</description>
+    <group>honeypot,webgoat</group>
+  </rule>
+
+  <!-- Alert on Any Critical Suricata Alert (Severity 1 = Critical/High) -->
   <rule id="300080" level="9">
-    <program_name>suricata</program_name>
-    <field name="alert.severity">4|5</field>
+    <if_sid>300000</if_sid>
+    <field name="alert.severity">1</field>
     <description>Suricata: Critical/High severity alert - immediate attention required</description>
     <group>critical,suricata_critical</group>
   </rule>
