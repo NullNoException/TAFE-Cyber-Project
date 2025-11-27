@@ -82,22 +82,12 @@ services:
       - seccomp=unconfined
       - label=disable
     networks:
-      external_net:
-        ipv4_address: 10.10.0.10
-      dmz_net:
-        ipv4_address: 10.10.10.254
-      internal_net:
-        ipv4_address: 10.10.20.254
       security_net:
         ipv4_address: 10.10.30.254
-      management_net:
-        ipv4_address: 10.10.40.254
     environment:
       - NV_PLATFORM_INFO=platform=Docker
       - NV_LOG_LEVEL=info
-      - NV_REST_URL=https://neuvector-allinone:8443
-      - CLUSTER_IP_INTERNAL=neuvector-allinone
-      - CLUSTER_IP_EXTERNAL=10.10.0.10
+      - ADVERTISE_IP=10.10.30.254
       - TZ=UTC
     ports:
       - "8443:8443"
