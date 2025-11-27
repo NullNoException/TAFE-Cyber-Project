@@ -64,13 +64,12 @@ services:
   # ===========================================================================
 
   # ---------------------------------------------------------------------------
-  # NeuVector All-in-One - Container Security Platform
+  # NeuVector Controller - Container Security Platform (Core)
   # ---------------------------------------------------------------------------
-  neuvector-allinone:
-    image: neuvector/allinone:5.4.7
-    container_name: neuvector.allinone
-    hostname: neuvector-allinone
-    pid: host
+  neuvector-controller:
+    image: neuvector/controller:5.4.7
+    container_name: neuvector.controller
+    hostname: neuvector-controller
     privileged: true
     cap_add:
       - SYS_ADMIN
@@ -83,53 +82,160 @@ services:
       - label=disable
     networks:
       security_net:
-        ipv4_address: 10.10.30.254
+        ipv4_address: 10.10.30.11
     environment:
+      - CLUSTER_JOIN_ADDR=neuvector-controller
       - NV_PLATFORM_INFO=platform=Docker
       - NV_LOG_LEVEL=info
-      - ADVERTISE_IP=10.10.30.254
       - TZ=UTC
     ports:
-      - "8443:8443"
       - "10443:10443"
-      - "11443:11443"
       - "18300:18300"
       - "18301:18301"
-      - "18400:18400"
-      - "18401:18401"
       - "18301:18301/udp"
     volumes:
       - /lib/modules:/lib/modules:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc:/host/proc:ro
       - /sys/fs/cgroup:/host/cgroup:ro
-      - /var/neuvector:/var/neuvector
+      - neuvector_controller_data:/var/neuvector
       - neuvector_logs:/var/log/neuvector
-      - ./configs/neuvector/certs/internal/ca.cert:/etc/neuvector/certs/internal/ca.cert:ro
-      - ./configs/neuvector/certs/internal/ca.key:/etc/neuvector/certs/internal/ca.key:ro
-      - ./configs/neuvector/certs/internal/cert.pem:/etc/neuvector/certs/internal/cert.pem:ro
-      - ./configs/neuvector/certs/internal/key.pem:/etc/neuvector/certs/internal/key.pem:ro
-      - ./configs/neuvector/certs/internal/cert.key:/etc/neuvector/certs/internal/cert.key:ro
+      - ./configs/neuvector/certs/internal:/etc/neuvector/certs/internal:rw
     logging:
       driver: syslog
       options:
         syslog-address: "udp://10.10.30.20:514"
-        tag: "neuvector"
+        tag: "neuvector-controller"
     deploy:
       resources:
         limits:
-          cpus: "2.0"
-          memory: 4G
-        reservations:
           cpus: "1.0"
           memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "https://localhost:8443/api/v1/system/health", "--no-check-certificate"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "https://localhost:10443/v1/cluster",
+          "--no-check-certificate",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # NeuVector Manager - Container Security Platform (Web UI & API)
+  # ---------------------------------------------------------------------------
+  neuvector-manager:
+    image: neuvector/manager:5.4.7
+    container_name: neuvector.manager
+    hostname: neuvector-manager
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.22
+      management_net:
+        ipv4_address: 10.10.40.22
+    environment:
+      - CTRL_SERVER_IP=neuvector-controller
+      - NV_LOG_LEVEL=info
+      - TZ=UTC
+    ports:
+      - "8443:8443"
+      - "11443:11443"
+    volumes:
+      - ./configs/neuvector/certs/internal:/etc/neuvector/certs/internal:rw
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "neuvector-manager"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    depends_on:
+      - neuvector-controller
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "https://localhost:8443/api/v1/system/health",
+          "--no-check-certificate",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # NeuVector Enforcer - Container Security Platform (Monitoring Agent)
+  # ---------------------------------------------------------------------------
+  neuvector-enforcer:
+    image: neuvector/enforcer:5.4.7
+    container_name: neuvector.enforcer
+    hostname: neuvector-enforcer
+    pid: host
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+      - SYS_PTRACE
+      - IPC_LOCK
+      - SYS_NICE
+    security_opt:
+      - apparmor=unconfined
+      - seccomp=unconfined
+      - label=disable
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.31
+    environment:
+      - CLUSTER_JOIN_ADDR=neuvector-controller
+      - NV_PLATFORM_INFO=platform=Docker
+      - NV_LOG_LEVEL=info
+      - TZ=UTC
+    ports:
+      - "18400:18400"
+      - "18401:18401"
+    volumes:
+      - /lib/modules:/lib/modules:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /sys/fs/cgroup:/host/cgroup:ro
+      - neuvector_enforcer_data:/var/neuvector
+      - neuvector_logs:/var/log/neuvector
+      - ./configs/neuvector/certs/internal:/etc/neuvector/certs/internal:rw
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "neuvector-enforcer"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    depends_on:
+      - neuvector-controller
+    restart: unless-stopped
 
   # ---------------------------------------------------------------------------
   # OpenVPN - VPN Gateway
@@ -170,7 +276,7 @@ services:
           memory: 512M
     restart: unless-stopped
     depends_on:
-      - neuvector-allinone
+      - neuvector-controller
     # Traefik routing configured in configs/traefik/dynamic.yml
 
   # ===========================================================================
@@ -314,7 +420,7 @@ services:
           cpus: "0.5"
           memory: 512M
     depends_on:
-      - neuvector-allinone
+      - neuvector-manager
       - dns-server
     restart: unless-stopped
     # Traefik Dashboard routed via dynamic.yml (admin-only-access middleware)
@@ -352,7 +458,7 @@ services:
     depends_on:
       - traefik
       - wazuh.manager
-      - neuvector-allinone
+      - neuvector-manager
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
@@ -803,6 +909,124 @@ services:
     # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
 
   # ===========================================================================
+  # HONEYPOT SERVICES - SECURITY DETECTION & ANALYSIS
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # Cowrie SSH/Telnet Honeypot - Brute-Force & Malware Detection
+  # ---------------------------------------------------------------------------
+  cowrie:
+    image: cowrie/cowrie:latest
+    container_name: cowrie
+    hostname: cowrie
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.70
+      security_net:
+        ipv4_address: 10.10.30.70
+    environment:
+      - TZ=UTC
+      - COWRIE_HOSTNAME=prodserver01
+    ports:
+      # SSH honeypot (redirected from standard SSH to avoid conflicts)
+      - "10.10.20.70:2222:2222"
+      # Telnet honeypot
+      - "10.10.20.70:2223:2223"
+    volumes:
+      # Configuration
+      - ./configs/honeypot/cowrie.cfg:/cowrie/etc/cowrie.cfg:ro
+      # Logs
+      - ./honeypot_logs/cowrie:/var/log/cowrie
+      # Downloads/Payloads
+      - ./honeypot_logs/cowrie_downloads:/cowrie/downloads
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "cowrie"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2222", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    depends_on:
+      - wazuh.manager
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Dionaea Multi-Protocol Honeypot - Windows Service Simulation
+  # ---------------------------------------------------------------------------
+  dionaea:
+    image: dinotools/dionaea:latest
+    container_name: dionaea
+    hostname: dionaea
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.71
+      security_net:
+        ipv4_address: 10.10.30.71
+    environment:
+      - TZ=UTC
+      - DIONAEA_NAME=dionaea-01
+    ports:
+      # SMB/Samba
+      - "10.10.20.71:445:445"
+      # FTP
+      - "10.10.20.71:21:21"
+      # HTTP
+      - "10.10.20.71:80:80"
+      # HTTPS
+      - "10.10.20.71:443:443"
+      # TFTP
+      - "10.10.20.71:69:69/udp"
+      # MSSQL
+      - "10.10.20.71:1433:1433"
+      # MySQL
+      - "10.10.20.71:3306:3306"
+      # RDP
+      - "10.10.20.71:3389:3389"
+    volumes:
+      # Configuration
+      - ./configs/honeypot/dionaea.cfg:/etc/dionaea/dionaea.cfg:ro
+      # Logs
+      - ./honeypot_logs/dionaea:/var/log/dionaea
+      # Downloads/Payloads
+      - ./honeypot_logs/dionaea_downloads:/dionaea/downloads
+      # Incidents
+      - ./honeypot_logs/dionaea_incidents:/dionaea/incidents
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "dionaea"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    depends_on:
+      - wazuh.manager
+    restart: unless-stopped
+
+  # ===========================================================================
   # BACKUP SERVICE
   # ===========================================================================
   # MONITORING & OBSERVABILITY - GRAFANA & PROMETHEUS
@@ -966,6 +1190,10 @@ services:
 # =============================================================================
 
 volumes:
+  # Honeypot Volumes
+  cowrie_logs:
+  dionaea_logs:
+
   # Wazuh Volumes
   wazuh_api_configuration:
   wazuh_etc:
@@ -999,6 +1227,8 @@ volumes:
   suricata_logs:
   suricata_rules:
   neuvector_logs:
+  neuvector_controller_data:
+  neuvector_enforcer_data:
 
   # OpenVPN Volume
   openvpn_data:
