@@ -85,7 +85,7 @@ providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
-    network: "infra_dmz_net"
+    network: "infra_internal_net"
     watch: true
 
   # File provider for dynamic configuration

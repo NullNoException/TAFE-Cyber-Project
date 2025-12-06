@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Custom Detection Rules for Attack Simulation
+  Three specific detections: Signal, Trigger, Operator Action
+-->
+<group name="custom_detection">
+
+  <!-- =====================================================================
+       1. SIGNAL DETECTION
+       Detects early warning signs like scanning or failed logins
+       ====================================================================== -->
+  <rule id="110001" level="7">
+    <if_sid>100201,100230</if_sid> <!-- Cowrie failed login OR Dionaea port scan -->
+    <description>SIGNAL DETECTED: Early warning signs of attack activity (Scanning/Brute Force)</description>
+    <group>custom_detection,signal</group>
+  </rule>
+
+  <!-- =====================================================================
+       2. TRIGGER DETECTION
+       Detects successful breaches or exploitation attempts
+       ====================================================================== -->
+  <rule id="110002" level="10">
+    <if_sid>100202,100223,100221</if_sid> <!-- Successful SSH login OR SQL Injection OR HTTP Exploit -->
+    <description>TRIGGER DETECTED: Confirmed attack activity or breach attempt</description>
+    <group>custom_detection,trigger</group>
+  </rule>
+
+  <!-- =====================================================================
+       3. OPERATOR ACTION DETECTION
+       Detects post-exploitation activities
+       ====================================================================== -->
+  <rule id="110003" level="12">
+    <if_sid>100205,100206,100207,100224</if_sid> <!-- Command exec, Suspicious command, File download, Malware -->
+    <description>OPERATOR ACTION DETECTED: Attacker is performing actions on the target</description>
+    <group>custom_detection,operator_action</group>
+  </rule>
+
+</group>

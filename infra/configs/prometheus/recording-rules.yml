@@ -1,0 +1,191 @@
+###############################################################################
+# Prometheus Recording Rules - CyberLab Infrastructure
+# Pre-calculated metrics for improved performance
+###############################################################################
+
+groups:
+  # =========================================================================
+  # INFRASTRUCTURE RECORDING RULES
+  # =========================================================================
+  - name: infrastructure_recording
+    interval: 15s
+    rules:
+      # CPU metrics aggregation
+      - record: instance:cpu:usage:rate5m
+        expr: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) by (instance)
+
+      - record: instance:cpu:usage:rate1h
+        expr: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[1h])) by (instance)
+
+      # Memory metrics aggregation
+      - record: instance:memory:usage:ratio
+        expr: 1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+
+      - record: instance:memory:available:bytes
+        expr: node_memory_MemAvailable_bytes
+
+      # Disk metrics aggregation
+      - record: instance:disk:free:ratio
+        expr: node_filesystem_free_bytes / node_filesystem_size_bytes
+
+      - record: instance:disk:used:bytes
+        expr: node_filesystem_size_bytes - node_filesystem_free_bytes
+
+      # Load average metrics
+      - record: instance:load:average:1m
+        expr: node_load1 / on(instance) group_left() count(node_cpu_seconds_total{mode="system"}) by (instance)
+
+      - record: instance:load:average:5m
+        expr: node_load5 / on(instance) group_left() count(node_cpu_seconds_total{mode="system"}) by (instance)
+
+  # =========================================================================
+  # NETWORK RECORDING RULES
+  # =========================================================================
+  - name: network_recording
+    interval: 15s
+    rules:
+      # Network bandwidth metrics
+      - record: instance:network:receive:bytes:rate5m
+        expr: rate(node_network_receive_bytes_total[5m])
+
+      - record: instance:network:transmit:bytes:rate5m
+        expr: rate(node_network_transmit_bytes_total[5m])
+
+      - record: instance:network:total:bytes:rate5m
+        expr: rate(node_network_receive_bytes_total[5m]) + rate(node_network_transmit_bytes_total[5m])
+
+      # Network error metrics
+      - record: instance:network:errors:rate5m
+        expr: rate(node_network_receive_errs_total[5m]) + rate(node_network_transmit_errs_total[5m])
+
+      - record: instance:network:dropped:packets:rate5m
+        expr: rate(node_network_receive_drop_total[5m]) + rate(node_network_transmit_drop_total[5m])
+
+  # =========================================================================
+  # DATABASE RECORDING RULES
+  # =========================================================================
+  - name: database_recording
+    interval: 30s
+    rules:
+      # PostgreSQL metrics aggregation
+      - record: postgres:connections:by:state
+        expr: sum by (job, state) (rate(pg_stat_activity_count{state!=""}[5m]))
+
+      - record: postgres:transaction:duration:95p
+        expr: histogram_quantile(0.95, rate(pg_stat_statements_query_time_seconds_bucket[5m]))
+
+      - record: postgres:database:size:bytes
+        expr: pg_database_size_bytes
+
+      # MongoDB metrics aggregation
+      - record: mongodb:operations:rate5m
+        expr: rate(mongodb_opcounters_total[5m])
+
+      - record: mongodb:memory:usage:ratio
+        expr: mongodb_memory_resident_mb / mongodb_memory_virtual_mb
+
+      # MariaDB metrics aggregation
+      - record: mariadb:connections:active
+        expr: mysql_global_status_threads_connected
+
+      - record: mariadb:queries:rate5m
+        expr: rate(mysql_global_status_queries[5m])
+
+  # =========================================================================
+  # SECURITY RECORDING RULES
+  # =========================================================================
+  - name: security_recording
+    interval: 30s
+    rules:
+      # NeuVector metrics aggregation
+      - record: neuvector:vulnerabilities:by:severity
+        expr: sum by (severity) (neuvector_container_vulnerabilities)
+
+      - record: neuvector:containers:compliant:ratio
+        expr: sum(neuvector_container_compliance_pass) / (sum(neuvector_container_compliance_pass) + sum(neuvector_container_compliance_fail))
+
+      # Wazuh security events aggregation
+      - record: wazuh:alerts:by:severity:rate5m
+        expr: sum by (severity) (rate(wazuh_alerts_total[5m]))
+
+      - record: wazuh:alerts:by:rule:rate5m
+        expr: sum by (rule_id) (rate(wazuh_alerts_total[5m]))
+
+      # Honeypot activity metrics
+      - record: honeypot:attacks:per:minute
+        expr: rate(cowrie_sessions_total[1m]) + rate(dionaea_connections_total[1m])
+
+      # Suricata IDS metrics
+      - record: suricata:alerts:by:severity:rate5m
+        expr: sum by (alert_severity) (rate(suricata_alerts_total[5m]))
+
+  # =========================================================================
+  # APPLICATION RECORDING RULES
+  # =========================================================================
+  - name: application_recording
+    interval: 15s
+    rules:
+      # Traefik metrics aggregation
+      - record: traefik:requests:by:service:rate5m
+        expr: sum by (service) (rate(traefik_router_requests_total[5m]))
+
+      - record: traefik:errors:by:service:rate5m
+        expr: sum by (service) (rate(traefik_router_requests_total{code=~"5.."}[5m]))
+
+      - record: traefik:error:rate:by:service
+        expr: sum by (service) (rate(traefik_router_requests_total{code=~"5.."}[5m])) / sum by (service) (rate(traefik_router_requests_total[5m]))
+
+      - record: traefik:request:duration:95p:by:service
+        expr: histogram_quantile(0.95, sum by (le, service) (rate(traefik_router_request_duration_seconds_bucket[5m])))
+
+      # Mattermost metrics aggregation
+      - record: mattermost:api:requests:rate5m
+        expr: rate(mattermost_api_requests_total[5m])
+
+      - record: mattermost:api:errors:rate5m
+        expr: rate(mattermost_api_requests_total{status=~"5.."}[5m])
+
+  # =========================================================================
+  # COMPOSITE BUSINESS METRICS
+  # =========================================================================
+  - name: business_metrics_recording
+    interval: 30s
+    rules:
+      # Overall system health score (0-100)
+      - record: system:health:score
+        expr: |
+          (
+            (1 - avg(instance:cpu:usage:ratio) by (cluster)) * 0.25 +
+            (1 - avg(instance:memory:usage:ratio) by (cluster)) * 0.25 +
+            (count(up{job!=""} == 1) / count(up{job!=""}) ) * 0.25 +
+            (1 - avg(traefik:error:rate:by:service) by (cluster)) * 0.25
+          ) * 100
+
+      # Service availability percentage
+      - record: service:availability:ratio
+        expr: sum by (service) (up{job!=""}) / count by (service) (up{job!=""})
+
+      # Infrastructure utilization score
+      - record: infrastructure:utilization:score
+        expr: |
+          avg(
+            instance:cpu:usage:ratio +
+            instance:memory:usage:ratio +
+            (1 - instance:disk:free:ratio)
+          ) * 100
+
+      # Security posture score (0-100)
+      - record: security:posture:score
+        expr: |
+          (
+            sum(neuvector_container_compliance_pass) / (sum(neuvector_container_compliance_pass) + sum(neuvector_container_compliance_fail)) * 100
+          )
+
+      # API performance score (0-100, higher is better)
+      - record: api:performance:score
+        expr: |
+          (
+            100 - (traefik:error:rate:by:service * 100) -
+            (traefik:request:duration:95p:by:service / 5)
+          )
+

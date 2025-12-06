@@ -1,6 +1,6 @@
 $TTL 86400
 @   IN  SOA ns1.cyberlab.local. admin.cyberlab.local. (
-            2025112605  ; Serial
+            2025112606  ; Serial
             3600        ; Refresh (1 hour)
             1800        ; Retry (30 minutes)
             604800      ; Expire (1 week)
@@ -43,19 +43,24 @@ ldapadmin           IN  A   10.10.20.41
 ldap-admin          IN  A   10.10.20.41
 
 ; VPN Services
-openvpn             IN  A   10.10.0.20
-vpn                 IN  A   10.10.0.20
-vpn-admin           IN  A   10.10.0.20
+openvpn             IN  A   10.10.10.5
+vpn                 IN  A   10.10.10.5
+vpn-admin           IN  A   10.10.10.5
+radius              IN  A   10.10.10.5
 
 ; Communication Services
-rocketchat          IN  A   10.10.20.50
-chat                IN  A   10.10.20.50
+mattermost          IN  A   10.10.20.53
+chat                IN  A   10.10.20.5
 
 ; Monitoring & Analytics (routed through Traefik on security network)
 suricata            IN  A   10.10.30.70
 prometheus          IN  A   10.10.30.5
 grafana             IN  A   10.10.30.5
 node-exporter       IN  A   10.10.40.40
+wireshark           IN  A   10.10.30.5
+pcap                IN  A   10.10.30.5
+netdata             IN  A   10.10.30.5
+influxdb            IN  A   10.10.30.5
 
 ; Honeypot Services (accessed via TCP routing through Traefik on specified ports)
 ; cowrie: SSH (2222), Telnet (2223)
@@ -76,9 +81,9 @@ workstation         IN  A   10.10.20.100
 desktop             IN  A   10.10.20.100
 
 ; Database Services
-postgres            IN  A   10.10.20.30
-postgresql          IN  A   10.10.20.30
-mongodb             IN  A   10.10.20.51
+postgres            IN  A   10.10.20.51
+postgresql          IN  A   10.10.20.51
+mongodb             IN  A   10.10.20.50
 
 ; Management & Admin
 management          IN  A   10.10.40.1

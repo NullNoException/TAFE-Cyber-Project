@@ -11,6 +11,7 @@ http:
           X-Forwarded-Proto: "https"
           X-Forwarded-Port: "443"
           X-Forwarded-For: ""  # Traefik will populate this automatically
+          X-Forwarded-Host: ""  # Traefik will populate this automatically
 
     # Security headers
     security-headers:
@@ -28,6 +29,12 @@ http:
     # Compression
     compression:
       compress: {}
+
+    # Grafana basic auth (auto-login with admin credentials)
+    grafana-basicauth:
+      basicAuth:
+        users:
+          - "admin:$2y$05$ZtaKjFCufgvmbd9lQqEKBOtfSXN6.TX1RFO0dO1z2CsZ6sAkWsvNe"
 
     # Authentication for Wazuh APIs (basic auth placeholder)
     auth-wazuh:
@@ -85,6 +92,7 @@ http:
           - "10.10.40.60/32"      # Grafana (management network)
           - "10.10.40.100/32"     # Workstation on Management
           - "127.0.0.1/32"        # Localhost (Docker)
+          - "0.0.0.0/0"           # Allow All (Temporary for Testing)
 
     # Public Services (DMZ) - External + Internal
     public-services-access:
@@ -96,6 +104,14 @@ http:
           - "10.10.30.0/24"     # Security Network
           - "10.10.40.0/24"     # Management Network
           - "127.0.0.1/32"      # Localhost (Docker)
+
+    # VPN Users Only - Access restricted to OpenVPN subnet + Management
+    vpn-only-access:
+      ipWhiteList:
+        sourceRange:
+          - "172.16.3.0/24"     # OpenVPN Clients Subnet (Default for OpenVPN AS)
+          - "10.10.40.0/24"     # Management Network (Admin access)
+          - "127.0.0.1/32"      # Localhost
 
   routers:
     # Nginx Web Server - Public Services (DMZ/Internal)
@@ -194,7 +210,19 @@ http:
       tls: {}
       middlewares:
         - "security-headers"
-        - "compression"      
+        - "compression"
+
+    # Daloradius Web UI - RADIUS Management
+    daloradius:
+      rule: "Host(`radius.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "daloradius-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+        - "admin-only-access"
 
     # DNS Server Console - Management Network Only (NO localhost/external access)
     dns-console:
@@ -208,19 +236,7 @@ http:
         - "compression"
         - "management-net-access"
 
-    # Rocket.Chat - Internal Network + Management Network
-    rocketchat:
-      rule: "Host(`chat.cyberlab.local`) || Host(`rocketchat.cyberlab.local`)"
-      entryPoints:
-        - "websecure"
-      service: "rocketchat-svc"
-      tls: {}
-      middlewares:
-        - "security-headers"
-        - "compression"
-        # - "internal-net-access"
-
-    # Workstation Desktop - Internal Network + Management Network
+    # Workstation Desktop - VPN Users Only + Management
     workstation:
       rule: "Host(`workstation.cyberlab.local`) || Host(`desktop.cyberlab.local`)"
       entryPoints:
@@ -230,7 +246,7 @@ http:
       middlewares:
         - "security-headers"
         - "compression"
-        - "internal-net-access"
+        - "vpn-only-access"
 
     # =========================================================================
     # MONITORING & OBSERVABILITY
@@ -249,32 +265,17 @@ http:
         - "compression"
         - "admin-only-access"
 
-    # Grafana Static Assets - No auth required (higher priority)
-    grafana-public:
-      rule: "Host(`grafana.cyberlab.local`) && (PathPrefix(`/public`) || PathPrefix(`/api/live`) || PathPrefix(`/assets`))"
-      entryPoints:
-        - "websecure"
-      service: "grafana-svc"
-      tls: {}
-      priority: 100
-      middlewares:
-        - "forwarded-headers"
-        - "security-headers"
-        - "compression"
-
-    # Grafana - Visualization & Dashboarding (Admin Only - lower priority)
+    # Grafana - Visualization & Dashboarding (No Restrictions)
     grafana:
       rule: "Host(`grafana.cyberlab.local`)"
       entryPoints:
         - "websecure"
       service: "grafana-svc"
       tls: {}
-      priority: 50
       middlewares:
         - "forwarded-headers"
         - "security-headers"
         - "compression"
-        - "admin-only-access"
 
     # =========================================================================
     # HONEYPOT SERVICES - INTERNAL NETWORK ONLY
@@ -320,6 +321,50 @@ http:
         - "compression"
         - "internal-net-access"
 
+    # =========================================================================
+    # PACKET CAPTURE & NETWORK ANALYSIS
+    # =========================================================================
+
+    # Wireshark Web UI - Packet Analysis
+    wireshark:
+      rule: "Host(`wireshark.cyberlab.local`) || Host(`pcap.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "wireshark-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+        - "security-net-access"
+
+    # =========================================================================
+    # REAL-TIME MONITORING & OBSERVABILITY WEB UIs
+    # =========================================================================
+
+    # Netdata - Real-time System & Network Monitoring
+    netdata:
+      rule: "Host(`netdata.cyberlab.local`) || Host(`monitoring.cyberlab.local`) || Host(`realtime.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "netdata-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+        - "security-net-access"
+
+    # InfluxDB - Time Series Database Admin UI
+    influxdb:
+      rule: "Host(`influxdb.cyberlab.local`) || Host(`timeseries.cyberlab.local`)"
+      entryPoints:
+        - "websecure"
+      service: "influxdb-svc"
+      tls: {}
+      middlewares:
+        - "security-headers"
+        - "compression"
+        - "security-net-access"
+
   services:
     nginx:
       loadBalancer:
@@ -364,15 +409,20 @@ http:
           - url: "https://openvpn:943"
         serversTransport: "openvpn-transport"
 
+    daloradius-svc:
+      loadBalancer:
+        servers:
+          - url: "http://daloradius:80"
+
     dns-console-svc:
       loadBalancer:
         servers:
           - url: "http://dns-server:5380"
 
-    rocketchat-svc:
+    mattermost-svc:
       loadBalancer:
         servers:
-          - url: "http://rocketchat:3000"
+          - url: "http://mattermost:8065"
 
     workstation-svc:
       loadBalancer:
@@ -406,6 +456,29 @@ http:
       loadBalancer:
         servers:
           - url: "http://webgoat:8080"
+
+    # =========================================================================
+    # PACKET CAPTURE & NETWORK ANALYSIS SERVICES
+    # =========================================================================
+
+    wireshark-svc:
+      loadBalancer:
+        servers:
+          - url: "http://wireshark-ui:3000"
+
+    # =========================================================================
+    # REAL-TIME MONITORING & OBSERVABILITY SERVICES
+    # =========================================================================
+
+    netdata-svc:
+      loadBalancer:
+        servers:
+          - url: "http://netdata:19999"
+
+    influxdb-svc:
+      loadBalancer:
+        servers:
+          - url: "http://influxdb:8086"
 
   serversTransports:
       # Server transport for OpenVPN Access Server

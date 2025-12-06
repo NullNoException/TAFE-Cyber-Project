@@ -1,0 +1,358 @@
+###############################################################################
+# Docker Compose - Prometheus Exporters for CyberLab Infrastructure
+# Deploy these services alongside your main infrastructure
+###############################################################################
+
+version: '3.8'
+
+services:
+
+  # =========================================================================
+  # DATABASE EXPORTERS
+  # =========================================================================
+
+  # PostgreSQL Exporter for Mattermost database
+  postgres-exporter-mm:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter-mm
+    hostname: postgres-exporter-mm
+    environment:
+      DATA_SOURCE_NAME: "postgresql://mmuser:Mattermost20250SecurePassword@postgres:5432/mattermost?sslmode=disable"
+    # ports:
+    #   - "9187:9187"
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.110
+      security_net:
+        ipv4_address: 10.10.30.100
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9187/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL Exporter for Multi-tenant database
+  postgres-exporter-mt:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter-mt
+    hostname: postgres-exporter-mt
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:lU5CoFz1O65ycZwIXU5tTU4GT0SKIyom@postgresql:5432/multitenant?sslmode=disable"
+    # ports:
+    #   - "9188:9187"
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.111
+      security_net:
+        ipv4_address: 10.10.30.102
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9187/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # MongoDB Exporter
+  mongodb-exporter:
+    image: percona/mongodb_exporter:latest
+    container_name: mongodb-exporter
+    hostname: mongodb-exporter
+    environment:
+      MONGODB_URI: "mongodb://mongodb:27017"
+    # ports:
+    #   - "9216:9216"
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.112
+      security_net:
+        ipv4_address: 10.10.30.103
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9216/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # MariaDB Exporter
+  mariadb-exporter:
+    image: prom/mysqld-exporter:latest
+    container_name: mariadb-exporter
+    hostname: mariadb-exporter
+    environment:
+      DATA_SOURCE_NAME: "exporter:exporter@tcp(mariadb:3306)/"
+    # ports:
+    #   - "9104:9104"
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.113
+      security_net:
+        ipv4_address: 10.10.30.104
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9104/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # =========================================================================
+  # NETWORK SERVICES EXPORTERS
+  # =========================================================================
+
+  # BIND DNS Exporter
+  dns-exporter:
+    image: kbudde/bind-exporter:latest
+    container_name: dns-exporter
+    hostname: dns-exporter
+    environment:
+      BIND_PORT: "10053"
+      BIND_URL: "http://dns-server:10053"
+    # ports:
+    #   - "9119:9119"
+    networks:
+      dmz_net:
+        ipv4_address: 10.10.10.110
+      security_net:
+        ipv4_address: 10.10.30.110
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9119/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # OpenVPN Exporter
+  openvpn-exporter:
+    image: wunder/openvpn-exporter:latest
+    container_name: openvpn-exporter
+    hostname: openvpn-exporter
+    environment:
+      OPENVPN_STATUS_FILE: "/etc/openvpn/openvpn-status.log"
+    volumes:
+      - openvpn_status:/etc/openvpn:ro
+    # ports:
+    #   - "9176:9176"
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.111
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9176/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # OpenLDAP Exporter
+  openldap-exporter:
+    image: syxesacid/openldap-exporter:latest
+    container_name: openldap-exporter
+    hostname: openldap-exporter
+    environment:
+      LDAP_HOST: "openldap"
+      LDAP_PORT: "389"
+      LDAP_BIND_DN: "cn=admin,dc=cyberlab,dc=local"
+      LDAP_BIND_PASSWORD: "admin_password"  # Change to actual password
+      LDAP_BASE_DN: "dc=cyberlab,dc=local"
+    # ports:
+    #   - "9330:9330"
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.114
+      security_net:
+        ipv4_address: 10.10.30.112
+    restart: unless-stopped
+    depends_on:
+      - openldap
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9330/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # =========================================================================
+  # SECURITY & HONEYPOT EXPORTERS (CUSTOM)
+  # =========================================================================
+
+  # Cowrie Honeypot Exporter
+  cowrie-exporter:
+    image: custom/cowrie-exporter:latest  # Custom image - see script below
+    container_name: cowrie-exporter
+    hostname: cowrie-exporter
+    volumes:
+      - cowrie_logs:/var/log/cowrie:ro
+    # ports:
+    #   - "9191:9191"
+    networks:
+      dmz_net:
+        ipv4_address: 10.10.10.120
+      security_net:
+        ipv4_address: 10.10.30.120
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9191/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Dionaea Honeypot Exporter
+  dionaea-exporter:
+    image: custom/dionaea-exporter:latest  # Custom image - see script below
+    container_name: dionaea-exporter
+    hostname: dionaea-exporter
+    volumes:
+      - dionaea_logs:/opt/dionaea/var:ro
+    # ports:
+    #   - "9192:9192"
+    networks:
+      dmz_net:
+        ipv4_address: 10.10.10.140
+      security_net:
+        ipv4_address: 10.10.30.121
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9192/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Suricata IDS Exporter
+  suricata-exporter:
+    image: custom/suricata-exporter:latest  # Custom image - see script below
+    container_name: suricata-exporter
+    hostname: suricata-exporter
+    volumes:
+      - suricata_logs:/var/log/suricata:ro
+    # ports:
+    #   - "9193:9193"
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.122
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9193/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # TCPDump Exporter
+  tcpdump-exporter:
+    image: custom/tcpdump-exporter:latest  # Custom image - see script below
+    container_name: tcpdump-exporter
+    hostname: tcpdump-exporter
+    volumes:
+      - pcap_data:/data/pcap:ro
+    # ports:
+    #   - "9194:9194"
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.123
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9194/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # =========================================================================
+  # APPLICATION EXPORTERS
+  # =========================================================================
+
+  # Mattermost Exporter
+  mattermost-exporter:
+    image: promcommunity/mattermost-exporter:latest
+    container_name: mattermost-exporter
+    hostname: mattermost-exporter
+    environment:
+      MATTERMOST_URL: "http://mattermost:8065"
+      MATTERMOST_TOKEN: "your_bot_token"  # Change to actual token
+    # ports:
+    #   - "9218:9218"
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.115
+      security_net:
+        ipv4_address: 10.10.30.113
+    restart: unless-stopped
+    depends_on:
+      - mattermost
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9218/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # =========================================================================
+  # SYSTEM & INFRASTRUCTURE EXPORTERS
+  # =========================================================================
+
+  # Node Exporter - Host system metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    hostname: node-exporter
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    # ports:
+    #   - "9100:9100"
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.150
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9100/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # cAdvisor - Docker container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    hostname: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    # ports:
+    #   - "8080:8080"
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.151
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  internal_net:
+    external: true
+  dmz_net:
+    external: true
+  security_net:
+    external: true
+  management_net:
+    external: true
+
+volumes:
+  openvpn_status:
+    external: true
+  cowrie_logs:
+    external: true
+  dionaea_logs:
+    external: true
+  suricata_logs:
+    external: true
+  pcap_data:
+    external: true
+

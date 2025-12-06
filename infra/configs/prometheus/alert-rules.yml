@@ -1,0 +1,553 @@
+###############################################################################
+# Prometheus Alert Rules - CyberLab Infrastructure
+# Professional-grade alerts for production monitoring
+###############################################################################
+
+groups:
+  # =========================================================================
+  # INFRASTRUCTURE ALERTS
+  # =========================================================================
+  - name: infrastructure_alerts
+    interval: 15s
+    rules:
+      # CPU Usage Alerts
+      - alert: HighCPUUsage
+        expr: (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 0.80
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for 5 minutes on {{ $labels.instance }}"
+          runbook_url: "https://wiki.cyberlab.local/runbooks/high-cpu"
+
+      - alert: CriticalCPUUsage
+        expr: (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "CRITICAL CPU usage"
+          description: "CPU usage is above 95% on {{ $labels.instance }}"
+          action: "Immediate investigation required"
+
+      # Memory Usage Alerts
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 85% for 5 minutes on {{ $labels.instance }}"
+
+      - alert: CriticalMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "CRITICAL memory shortage"
+          description: "Memory usage is above 95% on {{ $labels.instance }}"
+
+      # Disk Space Alerts
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_free_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.20
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "Low disk space"
+          description: "{{ $labels.device }} on {{ $labels.instance }} has less than 20% free"
+
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_free_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.10
+        for: 2m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "CRITICAL disk space shortage"
+          description: "{{ $labels.device }} on {{ $labels.instance }} has less than 10% free"
+
+      # Disk I/O Performance
+      - alert: HighDiskIOLatency
+        expr: rate(node_disk_io_time_milliseconds_total[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High disk I/O latency"
+          description: "Disk {{ $labels.device }} has high I/O latency on {{ $labels.instance }}"
+
+  # =========================================================================
+  # NETWORK & CONNECTIVITY ALERTS
+  # =========================================================================
+  - name: network_alerts
+    interval: 15s
+    rules:
+      - alert: HighNetworkTraffic
+        expr: rate(node_network_transmit_bytes_total{device!="lo"}[5m]) > 104857600  # 100MB/s
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High network traffic detected"
+          description: "Interface {{ $labels.device }} on {{ $labels.instance }} has traffic above 100MB/s"
+
+      - alert: PacketLossDetected
+        expr: rate(node_network_receive_errs_total[5m]) > 100
+        for: 2m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "Packet loss detected"
+          description: "Network errors on {{ $labels.device }} exceeding normal levels"
+
+      - alert: NetworkInterfaceDown
+        expr: node_network_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: network
+        annotations:
+          summary: "Network interface down"
+          description: "Interface {{ $labels.device }} on {{ $labels.instance }} is DOWN"
+
+  # =========================================================================
+  # DATABASE ALERTS
+  # =========================================================================
+  - name: database_alerts
+    interval: 15s
+    rules:
+      # PostgreSQL Alerts
+      - alert: PostgreSQLDown
+        expr: up{job=~"postgresql.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL instance down"
+          description: "PostgreSQL {{ $labels.job }} is not responding"
+
+      - alert: PostgreSQLSlowQueries
+        expr: pg_stat_statements_query_time_milliseconds > 30000
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow PostgreSQL query detected"
+          description: "Query executing for over 30 seconds on {{ $labels.instance }}"
+
+      - alert: PostgreSQLConnectionPoolExhausted
+        expr: pg_stat_activity_count >= 95
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL connection pool nearly exhausted"
+          description: "{{ $value }} connections in use (max ~100) on {{ $labels.instance }}"
+
+      - alert: PostgreSQLDeadlocks
+        expr: rate(pg_stat_database_deadlocks[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "PostgreSQL deadlocks detected"
+          description: "Deadlocks detected in {{ $labels.datname }} on {{ $labels.instance }}"
+
+      # MongoDB Alerts
+      - alert: MongoDBDown
+        expr: up{job="mongodb"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "MongoDB instance down"
+          description: "MongoDB on {{ $labels.instance }} is not responding"
+
+      - alert: MongoDBHighMemory
+        expr: mongodb_rs_members_health == 1 and mongodb_memory_virtual_mb > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "MongoDB memory usage high"
+          description: "MongoDB on {{ $labels.instance }} is using high memory"
+
+      - alert: MongoDBReplicationLag
+        expr: mongodb_rs_members_replication_lag_seconds > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "MongoDB replication lag detected"
+          description: "Replication lag {{ $value }}s on {{ $labels.instance }}"
+
+      # MariaDB Alerts
+      - alert: MariaDBDown
+        expr: up{job="mariadb"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "MariaDB instance down"
+          description: "MariaDB on {{ $labels.instance }} is not responding"
+
+      - alert: MariaDBHighThreads
+        expr: mysql_global_status_threads_connected / mysql_global_variables_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "MariaDB thread pool usage high"
+          description: "Thread usage at {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+  # =========================================================================
+  # SECURITY & THREAT DETECTION ALERTS
+  # =========================================================================
+  - name: security_alerts
+    interval: 15s
+    rules:
+      # NeuVector Alerts
+      - alert: NeuVectorDown
+        expr: up{job="neuvector"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "NeuVector container security engine down"
+          description: "NeuVector on {{ $labels.instance }} is not responding"
+
+      - alert: ContainerVulnerabilitiesDetected
+        expr: neuvector_container_vulnerabilities > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Vulnerabilities detected in container"
+          description: "{{ $value }} vulnerabilities found in {{ $labels.container }}"
+
+      - alert: ContainerComplianceViolation
+        expr: neuvector_container_compliance_fail > 0
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Container compliance violation"
+          description: "{{ $labels.container }} failed compliance check"
+
+      - alert: UnauthorizedContainerExecution
+        expr: neuvector_process_violations > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Unauthorized process execution in container"
+          description: "Suspicious process detected in {{ $labels.container }}"
+
+      # Wazuh Alerts
+      - alert: WazuhManagerDown
+        expr: up{job="wazuh-manager"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Wazuh manager is down"
+          description: "Wazuh SIEM manager on {{ $labels.instance }} is not responding"
+
+      - alert: HighSecurityEventRate
+        expr: rate(wazuh_alerts_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High security event rate detected"
+          description: "{{ $value }} security events per minute on {{ $labels.instance }}"
+
+      - alert: CriticalSecurityEvent
+        expr: wazuh_alerts_severity{severity="critical"} > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "CRITICAL security event detected"
+          description: "Critical security event on {{ $labels.instance }}"
+
+      # Honeypot Activity Alerts
+      - alert: HoneypotAttackDetected
+        expr: cowrie_sessions_total > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Multiple attack attempts on honeypot"
+          description: "Cowrie honeypot has {{ $value }} active sessions"
+
+      - alert: HoneypotMalwareDetection
+        expr: dionaea_offer_set{action="offer_change"} > 5
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Potential malware activity on Dionaea"
+          description: "Dionaea honeypot detected unusual behavior"
+
+      # Suricata IDS Alerts
+      - alert: SuricataHighAlertRate
+        expr: rate(suricata_alerts_total[5m]) > 50
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High Suricata IDS alert rate"
+          description: "{{ $value }} alerts per minute from Suricata"
+
+      - alert: SuricataCriticalDetection
+        expr: suricata_alerts_total{alert_severity="critical"} > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "CRITICAL detection from Suricata IDS"
+          description: "Critical threat detected by Suricata on {{ $labels.instance }}"
+
+  # =========================================================================
+  # APPLICATION & SERVICE ALERTS
+  # =========================================================================
+  - name: application_alerts
+    interval: 15s
+    rules:
+      # Traefik/Reverse Proxy
+      - alert: TraefikDown
+        expr: up{job="traefik"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "Traefik reverse proxy is down"
+          description: "Traefik on {{ $labels.instance }} is not responding"
+
+      - alert: TraefikHighErrorRate
+        expr: rate(traefik_router_requests_total{code=~"5.."}[5m]) / rate(traefik_router_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High error rate on Traefik router"
+          description: "{{ $value | humanizePercentage }} of requests failing for {{ $labels.service }}"
+
+      - alert: TraefikResponseTimeHigh
+        expr: traefik_router_request_duration_seconds{quantile="0.99"} > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High response time on Traefik service"
+          description: "99th percentile response time for {{ $labels.service }} is {{ $value }}s"
+
+      # Mattermost
+      - alert: MattermostDown
+        expr: up{job="mattermost"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "Mattermost service is down"
+          description: "Mattermost on {{ $labels.instance }} is not responding"
+
+      - alert: MattermostHighLatency
+        expr: mattermost_api_request_duration_ms > 2000
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High API latency in Mattermost"
+          description: "API response time exceeding 2 seconds on {{ $labels.instance }}"
+
+      # Grafana
+      - alert: GrafanaDown
+        expr: up{job="grafana"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "Grafana is down"
+          description: "Grafana on {{ $labels.instance }} is not responding"
+
+  # =========================================================================
+  # NETWORK SERVICES ALERTS
+  # =========================================================================
+  - name: network_services_alerts
+    interval: 15s
+    rules:
+      - alert: DNSServerDown
+        expr: up{job="dns-server"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: network
+        annotations:
+          summary: "DNS server is down"
+          description: "DNS server on {{ $labels.instance }} is not responding"
+
+      - alert: DNSHighQueryRate
+        expr: rate(bind_query_count_total[5m]) > 10000
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High DNS query rate detected"
+          description: "DNS query rate: {{ $value }} QPS on {{ $labels.instance }}"
+
+      - alert: OpenVPNDown
+        expr: up{job="openvpn"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: network
+        annotations:
+          summary: "OpenVPN service is down"
+          description: "OpenVPN on {{ $labels.instance }} is not responding"
+
+      - alert: OpenVPNHighConnectionCount
+        expr: openvpn_client_connections > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "OpenVPN connection pool nearly full"
+          description: "{{ $value }} connections active (max ~100) on {{ $labels.instance }}"
+
+      - alert: OpenLDAPDown
+        expr: up{job="openldap"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: authentication
+        annotations:
+          summary: "OpenLDAP service is down"
+          description: "OpenLDAP on {{ $labels.instance }} is not responding"
+
+      - alert: FreeRADIUSDown
+        expr: up{job="freeradius"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: authentication
+        annotations:
+          summary: "FreeRADIUS service is down"
+          description: "FreeRADIUS on {{ $labels.instance }} is not responding"
+
+  # =========================================================================
+  # STORAGE & BACKUP ALERTS
+  # =========================================================================
+  - name: storage_alerts
+    interval: 15s
+    rules:
+      - alert: InfluxDBDown
+        expr: up{job="influxdb"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: storage
+        annotations:
+          summary: "InfluxDB time-series database is down"
+          description: "InfluxDB on {{ $labels.instance }} is not responding"
+
+      - alert: InfluxDBHighMemory
+        expr: influxdb_mem_used_bytes / influxdb_mem_total_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "InfluxDB memory usage high"
+          description: "InfluxDB memory usage at {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: BackupFailed
+        expr: time() - backup_last_completion_timestamp > 86400
+        for: 10m
+        labels:
+          severity: warning
+          component: backup
+        annotations:
+          summary: "Backup has not completed in 24 hours"
+          description: "Last successful backup was {{ $value | humanizeDuration }} ago"
+
+  # =========================================================================
+  # CUSTOM BUSINESS ALERTS
+  # =========================================================================
+  - name: business_alerts
+    interval: 30s
+    rules:
+      # Service availability SLA
+      - alert: ServiceAvailabilityBelowSLA
+        expr: up{service!="demo"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: business
+        annotations:
+          summary: "Service availability below SLA"
+          description: "{{ $labels.service }} has been down for 5 minutes, violating 99.9% SLA"
+
+      # API Performance SLA
+      - alert: APIResponseTimeSLAViolation
+        expr: histogram_quantile(0.95, traefik_router_request_duration_seconds) > 2
+        for: 10m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "API response time SLA violation"
+          description: "{{ $labels.service }} 95th percentile response time exceeding 2s SLA"
+
+      # Error rate SLA
+      - alert: ErrorRateSLAViolation
+        expr: rate(traefik_router_requests_total{code=~"5.."}[5m]) / rate(traefik_router_requests_total[5m]) > 0.01
+        for: 15m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "Error rate SLA violation"
+          description: "{{ $labels.service }} error rate exceeding 0.1% for 15 minutes"
+

@@ -66,23 +66,21 @@ You can override HOST_IP, ADMIN_USER, ADMIN_PW_FILE, or PROFILE_OUT, e.g.:
   HOST_IP=192.168.0.84 ADMIN_USER=openvpn ./infra/scripts/init-openvpn.sh
 EOF
 
-echo "Configuring OpenVPN-AS to use LDAP auth against openldap..."
+echo "Configuring OpenVPN-AS to use RADIUS auth against Daloradius..."
 
-# Basic LDAP settings
-docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.module.type"     --value "ldap"             ConfigPut
-docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.ldap.0.server"  --value "openldap"         ConfigPut
-docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.ldap.0.port"    --value "389"              ConfigPut
-docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.ldap.0.use_ssl" --value "false"            ConfigPut
+# RADIUS settings
+docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.module.type" --value "radius" ConfigPut
+docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.radius.0.server.0.host" --value "10.10.20.45" ConfigPut
+docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.radius.0.server.0.secret" --value "testing123" ConfigPut
 
-# Base DN and bind DN for your OpenLDAP
-docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.ldap.0.base_dn"   --value "dc=cyberlab,dc=local"                 ConfigPut
-docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.ldap.0.bind_dn"   --value "cn=admin,dc=cyberlab,dc=local"        ConfigPut
-docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.ldap.0.bind_pw"   --value "$(cat ./secrets/ldap_admin_password)" ConfigPut
+# Fix for "Message-Authenticator" missing in FreeRADIUS 2.x reply
+docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.radius.0.server.0.verify_reply_authenticator" --value "false" ConfigPut
 
-# User search filter (simple example: match uid)
-docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "auth.ldap.0.search_filter" --value "(uid=%USERNAME%)" ConfigPut
+# Configure Ports (TCP 443 fallback for macOS/Docker compatibility)
+docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "vpn.server.daemon.udp.port" --value "1194" ConfigPut
+docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" --key "vpn.server.daemon.tcp.port" --value "443" ConfigPut
 
-echo "Applying LDAP auth configuration and restarting OpenVPN-AS..."
+echo "Applying RADIUS auth configuration and restarting OpenVPN-AS..."
 docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" start || true
 
 echo
@@ -120,9 +118,10 @@ echo
 echo "Next steps:"
 echo "  1) Add hosts entries on your LOCAL machine (not in containers):"
 echo "       10.10.10.5       traefik.cyberlab.local"
+echo "       10.10.10.5       vpn.cyberlab.local"
+echo "       10.10.10.5       radius.cyberlab.local"
 echo "       10.10.30.25      wazuh.cyberlab.local"
 echo "       10.10.0.10       neuvector.cyberlab.local"
-echo "       10.10.20.30      ldap.cyberlab.local"
 echo "       10.10.10.50      dns.cyberlab.local"
 echo
 echo "  2) Open the OpenVPN-AS admin UI:"
@@ -131,22 +130,15 @@ echo "     Login with:"
 echo "       Username: $ADMIN_USER"
 echo "       Password: contents of $ADMIN_PW_FILE"
 echo
-echo "  3) Create LDAP users in phpLDAPadmin under dc=cyberlab,dc=local"
-echo "     with a 'uid' attribute (e.g. uid=alice)."
+echo "  3) Create RADIUS users in Daloradius:"
+echo "       URL: https://radius.cyberlab.local"
+echo "       Default Admin: administrator / radius"
 echo
-echo "  4) Test LDAP login to OpenVPN:"
-echo "       - Use username = uid from LDAP (e.g. alice)"
-echo "       - Use the LDAP user password you set in phpLDAPadmin."
+echo "  4) Download VPN client profile:"
+echo "       https://vpn.cyberlab.local/"
+echo "       (Login with RADIUS user credentials)"
 echo
-echo "  5) Download VPN client profile:"
-echo "       https://$HOST_IP:943/"
-echo
-echo "  6) Once connected via VPN, access services at:"
+echo "  5) Once connected via VPN, access services at:"
 echo "       https://traefik.cyberlab.local (only accessible through VPN)"
 echo "       https://wazuh.cyberlab.local (only accessible through VPN)"
 echo "       https://neuvector.cyberlab.local (only accessible through VPN)"
-echo "       https://ldap.cyberlab.local (only accessible through VPN)"
-
-echo
-echo "  4) (Optional) Download or verify a client profile from the OpenVPN"
-echo "     user portal: https://$HOST_IP:943/"

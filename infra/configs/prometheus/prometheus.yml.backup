@@ -1,0 +1,243 @@
+###############################################################################
+# Prometheus Configuration - CyberLab Infrastructure Metrics Collection
+###############################################################################
+
+global:
+  scrape_interval: 15s        # Default scrape interval for all targets
+  evaluation_interval: 15s    # Evaluate rules every 15 seconds
+  external_labels:
+    cluster: 'cyberlab'
+    environment: 'lab'
+
+# Alertmanager configuration (optional - can be enabled later)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Load rules once and periodically evaluate them
+rule_files:
+  # Uncomment when rule files are created
+  # - "alert_rules.yml"
+  # - "recording_rules.yml"
+
+###############################################################################
+# SCRAPE CONFIGURATIONS
+###############################################################################
+
+scrape_configs:
+  # =========================================================================
+  # Prometheus Self-Monitoring
+  # =========================================================================
+  - job_name: 'prometheus'
+    honor_timestamps: true
+    metrics_path: '/metrics'
+    scheme: http
+    static_configs:
+      - targets: ['localhost:9090']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - source_labels: [__scheme__]
+        target_label: scheme
+
+  # =========================================================================
+  # TRAEFIK REVERSE PROXY - METRICS
+  # =========================================================================
+  - job_name: 'traefik'
+    honor_timestamps: true
+    metrics_path: '/metrics'
+    scheme: http
+    static_configs:
+      - targets: ['traefik:8082']
+        labels:
+          service: 'traefik'
+          layer: 'proxy'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # =========================================================================
+  # MONITORING STACK
+  # =========================================================================
+  - job_name: 'grafana'
+    honor_timestamps: true
+    metrics_path: '/metrics'
+    scheme: http
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+          layer: 'observability'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # =========================================================================
+  # SECURITY LAYER - CONTAINER SECURITY
+  # =========================================================================
+  - job_name: 'neuvector'
+    honor_timestamps: true
+    metrics_path: '/api/prometheus'
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    static_configs:
+      - targets: ['neuvector-allinone:8443']
+        labels:
+          service: 'neuvector'
+          layer: 'security'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # =========================================================================
+  # WAZUH SECURITY SERVICES
+  # =========================================================================
+
+  # Wazuh Manager - Health check on security network
+  - job_name: 'wazuh-manager'
+    honor_timestamps: true
+    metrics_path: '/'
+    scheme: http
+    static_configs:
+      - targets: ['10.10.30.20:514']  # Wazuh Manager on security_net with syslog port
+        labels:
+          service: 'wazuh-manager'
+          layer: 'security'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+    scrape_interval: 60s
+    scrape_timeout: 10s
+
+  # Wazuh Indexer (OpenSearch) - Health check only (no Prometheus endpoint)
+  # NOTE: Wazuh Indexer returns JSON health status, not Prometheus metrics
+  # Disabled until proper metrics exporter is deployed
+  # - job_name: 'wazuh-indexer'
+  #   honor_timestamps: true
+  #   metrics_path: '/'
+  #   scheme: https
+  #   tls_config:
+  #     insecure_skip_verify: true
+  #   basic_auth:
+  #     username: 'admin'
+  #     password: 'SecretPassword'
+  #   static_configs:
+  #     - targets: ['10.10.30.10:9200']
+  #       labels:
+  #         service: 'wazuh-indexer'
+  #         layer: 'storage'
+  #   scrape_interval: 30s
+
+  # =========================================================================
+  # DATABASE LAYER - METRICS EXPORTERS
+  # =========================================================================
+  
+  # PostgreSQL exporter (if deployed separately)
+  # - job_name: 'postgresql'
+  #   honor_timestamps: true
+  #   metrics_path: '/metrics'
+  #   scheme: http
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #       labels:
+  #         service: 'postgresql'
+  #         layer: 'database'
+  #   scrape_interval: 30s
+
+  # MongoDB exporter (if deployed separately)
+  # - job_name: 'mongodb'
+  #   honor_timestamps: true
+  #   metrics_path: '/metrics'
+  #   scheme: http
+  #   static_configs:
+  #     - targets: ['mongodb-exporter:9216']
+  #       labels:
+  #         service: 'mongodb'
+  #         layer: 'database'
+  #   scrape_interval: 30s
+
+  # =========================================================================
+  # COMMUNICATION SERVICES
+  # =========================================================================
+  
+  # Rocket.Chat (requires metrics exporter)
+  # - job_name: 'rocketchat'
+  #   honor_timestamps: true
+  #   metrics_path: '/metrics'
+  #   scheme: http
+  #   static_configs:
+  #     - targets: ['rocketchat:3000']
+  #       labels:
+  #         service: 'rocketchat'
+  #         layer: 'communication'
+  #   scrape_interval: 30s
+
+  # =========================================================================
+  # INFRASTRUCTURE - SYSTEM METRICS
+  # =========================================================================
+  
+  # Node Exporter (if deployed for host metrics)
+  # - job_name: 'node'
+  #   honor_timestamps: true
+  #   metrics_path: '/metrics'
+  #   scheme: http
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+  #       labels:
+  #         service: 'host'
+  #         layer: 'infrastructure'
+  #   scrape_interval: 15s
+
+  # cAdvisor (if deployed for container metrics)
+  # - job_name: 'cadvisor'
+  #   honor_timestamps: true
+  #   metrics_path: '/metrics'
+  #   scheme: http
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']
+  #       labels:
+  #         service: 'cadvisor'
+  #         layer: 'infrastructure'
+  #   scrape_interval: 30s
+
+###############################################################################
+# REMOTE STORAGE (OPTIONAL - For Long-Term Storage)
+###############################################################################
+
+# Uncomment to enable remote write to a long-term storage backend
+# remote_write:
+#   - url: "http://cortex:9009/api/prom/push"
+#     write_relabel_configs:
+#       - source_labels: [__name__]
+#         regex: 'node_.*|container_.*'
+#         action: keep
+
+# remote_read:
+#   - url: "http://cortex:9009/api/prom/read"
+
+###############################################################################
+# ADDITIONAL NOTES
+###############################################################################
+
+# Metrics Available from Traefik:
+# - traefik_http_requests_total
+# - traefik_http_request_duration_seconds
+# - traefik_http_requests_duration_seconds_bucket
+# - traefik_entrypoint_requests_total
+# - traefik_entrypoint_request_duration_seconds
+# - traefik_service_requests_total
+# - traefik_service_request_duration_seconds
+# - traefik_router_requests_total
+# - traefik_router_request_duration_seconds
+
+# Next Steps:
+# 1. Deploy metric exporters for databases, services without built-in metrics
+# 2. Create Grafana dashboards to visualize the metrics
+# 3. Define alert rules for critical thresholds
+# 4. Configure Prometheus retention policies

@@ -55,6 +55,14 @@ networks:
           gateway: 10.10.40.1
 
 # =============================================================================
+# SECRETS
+# =============================================================================
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+
+# =============================================================================
 # SERVICES
 # =============================================================================
 
@@ -62,6 +70,92 @@ services:
   # ===========================================================================
   # EXTERNAL/SECURITY LAYER
   # ===========================================================================
+  # ---------------------------------------------------------------------------
+  # Traefik - Reverse Proxy & Load Balancer (ENABLED)
+  # ---------------------------------------------------------------------------
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    hostname: traefik
+    networks:
+      external_net:
+        ipv4_address: 10.10.0.5
+      dmz_net:
+        ipv4_address: 10.10.10.5
+      internal_net:
+        ipv4_address: 10.10.20.5
+      security_net:
+        ipv4_address: 10.10.30.5
+      management_net:
+        ipv4_address: 10.10.40.5
+    dns:
+      - 10.10.30.101
+      - 10.10.20.251
+      - 10.10.40.101
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8082:8082"
+    environment:
+      - TZ=UTC
+    command:
+      - --api.dashboard=true
+      - --api.insecure=false
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.filename=/etc/traefik/traefik.yml
+      - --providers.file.watch=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.metrics.address=:8082
+      - --log.level=INFO
+      # Prometheus metrics
+      - --metrics.prometheus=true
+      - --metrics.prometheus.entrypoint=metrics
+      - --metrics.prometheus.addentrypointslabels=true
+      - --metrics.prometheus.addserviceslabels=true
+      - --metrics.prometheus.addrouterslabels=true
+      - --metrics.prometheus.buckets=0.01,0.05,0.1,0.25,0.5,1,2.5,5,10
+      # OTLP Tracing (HTTP endpoint for OpenTelemetry Collector)
+      - --tracing.otlp.http=true
+      - --tracing.otlp.http.endpoint=http://10.10.30.30:4318
+      - --tracing.otlp.samplerate=1.0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./configs/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./configs/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ./certs/services/traefik-cert.pem:/certs/traefik-cert.pem:ro
+      - ./certs/services/traefik-key.pem:/certs/traefik-key.pem:ro
+      - ./certs/ca/ca-cert.pem:/certs/ca-cert.pem:ro
+      - ./configs/wazuh/wazuh_indexer_ssl_certs/root-ca.pem:/etc/traefik/certs/root-ca.pem:ro
+      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.dashboard.pem:/etc/traefik/certs/wazuh.dashboard.pem:ro
+      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.dashboard-key.pem:/etc/traefik/certs/wazuh.dashboard-key.pem:ro
+      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.manager.pem:/etc/traefik/certs/wazuh.manager.pem:ro
+      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.manager-key.pem:/etc/traefik/certs/wazuh.manager-key.pem:ro
+      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.indexer.pem:/etc/traefik/certs/wazuh.indexer.pem:ro
+      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.indexer-key.pem:/etc/traefik/certs/wazuh.indexer-key.pem:ro
+      - traefik_logs:/var/log/traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.cyberlab.local`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "traefik"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    depends_on:
+      - neuvector-allinone
+      - dns-server
+    restart: unless-stopped
+    # Traefik Dashboard routed via dynamic.yml (admin-only-access middleware)
 
   # ---------------------------------------------------------------------------
   # NeuVector All-in-One - Container Security Platform
@@ -142,12 +236,17 @@ services:
         ipv4_address: 10.10.0.20
       internal_net:
         ipv4_address: 10.10.20.201
+      security_net:
+        ipv4_address: 10.10.30.201
+      management_net:
+        ipv4_address: 10.10.40.201
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=UTC
     ports:
       - "1194:1194/udp" # VPN Protocol (direct access)
+      - "1194:443/tcp" # VPN Protocol (TCP fallback)
     volumes:
       - openvpn_data:/openvpn
     logging:
@@ -164,6 +263,58 @@ services:
     depends_on:
       - neuvector-allinone
     # Traefik routing configured in configs/traefik/dynamic.yml
+
+  # ---------------------------------------------------------------------------
+  # MariaDB - Database for Daloradius
+  # ---------------------------------------------------------------------------
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    hostname: mariadb
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.46
+    environment:
+      - MARIADB_ROOT_PASSWORD=rootpassword123
+      - MARIADB_DATABASE=radius
+      - MARIADB_USER=radius
+      - MARIADB_PASSWORD=radiuspassword123
+      - TZ=UTC
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
+
+  # ---------------------------------------------------------------------------
+  # Daloradius - RADIUS Server + Web UI
+  # ---------------------------------------------------------------------------
+  daloradius:
+    image: asdaru/freeradius-mysql-daloradius:nomysql
+    platform: linux/amd64
+    container_name: daloradius
+    hostname: daloradius
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.45
+      security_net:
+        ipv4_address: 10.10.30.45
+    environment:
+      - MYSQL_HOST=mariadb
+      - MYSQL_PORT=3306
+      - MYSQL_USER=radius
+      - MYSQL_PASSWORD=radiuspassword123
+      - MYSQL_DATABASE=radius
+      - TZ=UTC
+    # ports:
+    #   - "1812:1812/udp"
+    #   - "1813:1813/udp"
+    depends_on:
+      - mariadb
+      - traefik
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
 
   # ===========================================================================
   # DMZ LAYER - PUBLIC FACING SERVICES
@@ -183,9 +334,9 @@ services:
         ipv4_address: 10.10.40.101
       internal_net:
         ipv4_address: 10.10.20.251
-    ports:
-      - "53:53/tcp"
-      - "53:53/udp"
+    # ports:
+    #   - "53:53/tcp"
+    #   - "53:53/udp"
     environment:
       - TZ=UTC
     volumes:
@@ -226,90 +377,6 @@ services:
         tag: "dns-server"
         syslog-format: "rfc5424"
     restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
-  # Traefik - Reverse Proxy & Load Balancer (ENABLED)
-  # ---------------------------------------------------------------------------
-  traefik:
-    image: traefik:v3.0
-    container_name: traefik
-    hostname: traefik
-    networks:
-      external_net:
-        ipv4_address: 10.10.0.30
-      dmz_net:
-        ipv4_address: 10.10.10.5
-      internal_net:
-        ipv4_address: 10.10.20.5
-      security_net:
-        ipv4_address: 10.10.30.5
-      management_net:
-        ipv4_address: 10.10.40.5
-    dns:
-      - 10.10.30.101
-      - 10.10.20.251
-      - 10.10.40.101
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8082:8082"
-    environment:
-      - TZ=UTC
-    command:
-      - --api.dashboard=true
-      - --api.insecure=false
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --providers.file.filename=/etc/traefik/traefik.yml
-      - --providers.file.watch=true
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --entrypoints.metrics.address=:8082
-      - --log.level=INFO
-      # Prometheus metrics
-      - --metrics.prometheus=true
-      - --metrics.prometheus.entrypoint=metrics
-      - --metrics.prometheus.addentrypointslabels=true
-      - --metrics.prometheus.addserviceslabels=true
-      - --metrics.prometheus.addrouterslabels=true
-      - --metrics.prometheus.buckets=0.01,0.05,0.1,0.25,0.5,1,2.5,5,10
-      # OTLP Tracing (HTTP endpoint for OpenTelemetry Collector)
-      - --tracing.otlp.http=true
-      - --tracing.otlp.http.endpoint=http://10.10.30.30:4318
-      - --tracing.otlp.samplerate=1.0
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./configs/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./configs/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
-      - ./configs/wazuh/wazuh_indexer_ssl_certs/root-ca.pem:/etc/traefik/certs/root-ca.pem:ro
-      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.dashboard.pem:/etc/traefik/certs/wazuh.dashboard.pem:ro
-      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.dashboard-key.pem:/etc/traefik/certs/wazuh.dashboard-key.pem:ro
-      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.manager.pem:/etc/traefik/certs/wazuh.manager.pem:ro
-      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.manager-key.pem:/etc/traefik/certs/wazuh.manager-key.pem:ro
-      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.indexer.pem:/etc/traefik/certs/wazuh.indexer.pem:ro
-      - ./configs/wazuh/wazuh_indexer_ssl_certs/wazuh.indexer-key.pem:/etc/traefik/certs/wazuh.indexer-key.pem:ro
-      - traefik_logs:/var/log/traefik
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`traefik.cyberlab.local`)"
-      - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
-      - "traefik.http.routers.dashboard.tls=true"
-    logging:
-      driver: syslog
-      options:
-        syslog-address: "udp://10.10.30.20:514"
-        tag: "traefik"
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
-    depends_on:
-      - neuvector-allinone
-      - dns-server
-    restart: unless-stopped
-    # Traefik Dashboard routed via dynamic.yml (admin-only-access middleware)
 
   # ---------------------------------------------------------------------------
   # Nginx - Web Server (Behind Traefik)
@@ -416,9 +483,9 @@ services:
       - openldap_slapd:/etc/ldap/slapd.d
       - ./configs/ldap/ldif:/ldif:ro
       - openldap_logs:/var/log/slapd
-    ports:
-      - "389:389"
-      - "636:636"
+    # ports:
+    #   - "389:389"
+    #   - "636:636"
     logging:
       driver: syslog
       options:
@@ -463,6 +530,7 @@ services:
           memory: 256M
     depends_on:
       - openldap
+      - traefik
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
@@ -482,7 +550,15 @@ services:
       - TZ=UTC
     volumes:
       - mongodb_data:/data/db
-    command: mongod --oplogSize 128 --replSet rs0
+      - ./scripts/init-mongodb-rs.sh:/usr/local/bin/init-mongodb-rs.sh:ro
+    entrypoint: /bin/bash
+    command: /usr/local/bin/init-mongodb-rs.sh
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     logging:
       driver: syslog
       options:
@@ -496,44 +572,6 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=false"
-
-  # ---------------------------------------------------------------------------
-  # Rocket.Chat - Team Communication Platform
-  # Note: Uses MongoDB for document storage (ARM64 compatible)
-  # ---------------------------------------------------------------------------
-  rocketchat:
-    image: rocketchat/rocket.chat:7.5.0
-    container_name: rocketchat
-    hostname: rocketchat
-    networks:
-      internal_net:
-        ipv4_address: 10.10.20.52
-      security_net:
-        ipv4_address: 10.10.30.52
-    environment:
-      - MONGO_URL=mongodb://mongodb:27017/rocketchat?replicaSet=rs0
-      - ROOT_URL=https://chat.cyberlab.local
-      - LOG_LEVEL=info
-      - TZ=UTC
-    depends_on:
-      - mongodb
-    volumes:
-      - rocketchat_data:/app/uploads
-      - rocketchat_logs:/app/logs
-    logging:
-      driver: syslog
-      options:
-        syslog-address: "udp://10.10.30.20:514"
-        tag: "rocketchat"
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 1G
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-    # NOTE: Routing configured via Traefik dynamic.yml (rocketchat router)
 
   # ---------------------------------------------------------------------------
   # Workstation - GUI Desktop for Client Access (VPN Gateway)
@@ -557,23 +595,130 @@ services:
       - 10.10.30.101
       - 10.10.20.251
       - 10.10.40.101
+    extra_hosts:
+      - "traefik.cyberlab.local:10.10.20.5"
+      - "chat.cyberlab.local:10.10.20.5"
+      - "grafana.cyberlab.local:10.10.20.5"
+      - "prometheus.cyberlab.local:10.10.20.5"
+      - "wazuh.cyberlab.local:10.10.20.5"
     environment:
       - VNC_PASSWORD=cyberlab123
       - TZ=UTC
-    ports:
-      - "6080:80" # VNC Web UI (noVNC)
-      - "5900:5900" # VNC Port
+    # ports:
+    #   - "6080:80" # VNC Web UI (noVNC)
+    #   - "5900:5900" # VNC Port
     volumes:
       - ./configs/ldap/ldif:/home/ubuntu/ldap-configs:ro
     deploy:
       resources:
         limits:
-          cpus: "2.0"
-          memory: 2G
+          cpus: "4.0"
+          memory: 4G
     restart: unless-stopped
     labels:
       - "traefik.enable=false"
     # NOTE: Access controlled via Traefik dynamic.yml (internal-net-access middleware)
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - Database for Mattermost
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    hostname: postgres
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.52
+    environment:
+      - POSTGRES_DB=mattermost
+      - POSTGRES_USER=mmuser
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mmuser -d mattermost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
+
+  # ---------------------------------------------------------------------------
+  # Mattermost - Team Communication Platform
+  # ---------------------------------------------------------------------------
+  mattermost:
+    image: mattermost/mattermost-team-edition:latest
+    container_name: mattermost
+    hostname: mattermost
+    networks:
+      dmz_net:
+        ipv4_address: 10.10.10.53
+      internal_net:
+        ipv4_address: 10.10.20.53
+      security_net:
+        ipv4_address: 10.10.30.53
+    dns:
+      - 10.10.30.101
+      - 10.10.20.251
+      - 10.10.40.101
+    extra_hosts:
+      - "mattermost.cyberlab.local:10.10.20.53"
+      - "chat.cyberlab.local:10.10.20.5"
+      - "postgres.cyberlab.local:10.10.20.51"
+      - "traefik.cyberlab.local:10.10.20.5"
+    environment:
+      - MM_SQLSETTINGS_DRIVERNAME=postgres
+      - MM_SQLSETTINGS_DATASOURCE=postgres://mmuser:Mattermost20250SecurePassword@postgres:5432/mattermost?sslmode=disable
+      - MM_SERVICESETTINGS_SITEURL=https://chat.cyberlab.local
+      - MM_TEAMSETTINGS_SITENAME=CyberLab
+      - MM_SERVICESETTINGS_LISTENADDRESS=0.0.0.0:8065
+      - MM_LOGSETTINGS_CONSOLELEVEL=info
+      - MM_FILESETTINGS_PUBLICLINKSALT=K8mX9pQrL2vN5sT4wY7uJ3hG6fD1bC8eZ0aS5kP2
+      - MM_TEAMSETTINGS_MAXUSERSPERTEAM=100
+      - MM_SERVICESETTINGS_ENABLEOAUTH=true
+      - MM_SERVICESETTINGS_ENABLEOPENSERVER=true
+      - MM_PASSWORDSETTINGS_MINIMUMLENGTH=8
+      - MM_PASSWORDSETTINGS_LOWERCASE=true
+      - MM_PASSWORDSETTINGS_NUMBER=true
+      - MM_PASSWORDSETTINGS_UPPERCASE=true
+      - TZ=UTC
+    secrets:
+      - postgres_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+    volumes:
+      - mattermost_data:/mattermost/data
+      - mattermost_logs:/mattermost/logs
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "mattermost"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mattermost.rule=Host(`chat.cyberlab.local`)"
+      - "traefik.http.routers.mattermost.entrypoints=websecure"
+      - "traefik.http.routers.mattermost.tls=true"
+      - "traefik.http.services.mattermost.loadbalancer.server.port=8065"
+    # NOTE: Full routing configured via Traefik dynamic.yml (mattermost router)
 
   # ===========================================================================
   # SECURITY NETWORK - MONITORING & ANALYSIS
@@ -648,10 +793,10 @@ services:
       - 10.10.20.251
       - 10.10.40.101
     # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
-    ports:
-      - "514:514/udp"
-      - "1514:1514"
-      - "1515:1515"
+    # ports:
+    #   - "514:514/udp"
+    #   - "1514:1514"
+    #   - "1515:1515"
     ulimits:
       memlock:
         soft: -1
@@ -689,6 +834,7 @@ services:
       # Suricata integration - rules mounted to container
       # Decoders disabled due to format incompatibility - using native Wazuh JSON parsing
       - ./configs/wazuh/suricata_rules.xml:/var/ossec/etc/rules/suricata_rules.xml:ro
+      - ./configs/wazuh/custom_detection_rules.xml:/var/ossec/etc/rules/custom_detection_rules.xml:ro
       # Share Suricata logs volume for log monitoring
       - suricata_logs:/var/log/suricata:ro
     logging:
@@ -726,8 +872,8 @@ services:
       - INDEXER_USERNAME=admin
       - INDEXER_PASSWORD=SecretPassword
       - WAZUH_API_URL=https://wazuh.manager
-      - DASHBOARD_USERNAME=kibanaserver
-      - DASHBOARD_PASSWORD=kibanaserver
+      - DASHBOARD_USERNAME=admin
+      - DASHBOARD_PASSWORD=admin
       - API_USERNAME=wazuh-wui
       - API_PASSWORD=MyS3cr37P450r.*-
       - TZ=UTC
@@ -1048,6 +1194,8 @@ services:
       - "--web.external-url=https://prometheus.cyberlab.local"
     volumes:
       - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./configs/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - ./configs/prometheus/recording-rules.yml:/etc/prometheus/recording-rules.yml:ro
       - prometheus_data:/prometheus
     logging:
       driver: syslog
@@ -1073,32 +1221,32 @@ services:
   # Grafana - Visualization & Dashboarding
   # ---------------------------------------------------------------------------
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.4.0
     container_name: grafana
     hostname: grafana
     networks:
+      internal_net:
+        ipv4_address: 10.10.20.61
       security_net:
         ipv4_address: 10.10.30.60
       management_net:
         ipv4_address: 10.10.40.60
+    # ports:
+    #   - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-SecureG@fana1}
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SECURITY_DISABLE_BRUTE_FORCE_LOGIN_PROTECTION=false
-      - GF_SECURITY_LOGIN_MAXIMUM_INACTIVE_LIFETIME_DAYS=7
-      - GF_SERVER_ROOT_URL=https://grafana.cyberlab.local/
-      - GF_SERVER_SERVE_FROM_SUB_PATH=false
-      - GF_SECURITY_COOKIE_SECURE=true
-      - GF_SECURITY_COOKIE_SAMESITE=Lax
-      - GF_SECURITY_COOKIE_HTTPONLY=true
       - GF_LOG_MODE=console
       - GF_LOG_LEVEL=info
-      - GF_SERVER_X_CONTENT_TYPE_OPTIONS=nosniff
-      - GF_SECURITY_X_FRAME_OPTIONS=SAMEORIGIN
+      - GF_ROOT_URL=https://grafana.cyberlab.local
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=SecureG@fana1
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_AUTH_ANONYMOUS_ENABLED=true
+      - GF_SECURITY_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SERVER_X_FORWARDED_PROTO=https
       - TZ=UTC
     volumes:
+      - ./configs/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - ./configs/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_storage:/var/lib/grafana
@@ -1122,6 +1270,191 @@ services:
     labels:
       - "traefik.enable=true"
     # NOTE: Routing configured via Traefik dynamic.yml (grafana router)
+
+  # ===========================================================================
+  # PACKET CAPTURE & NETWORK ANALYSIS
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # TCPDump PCAP Collector - Lightweight packet capture for all networks
+  # Captures all traffic and stores PCAP files for analysis
+  # ---------------------------------------------------------------------------
+  tcpdump-collector:
+    image: nicolaka/netshoot:latest
+    container_name: tcpdump-collector
+    hostname: tcpdump-collector
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.91
+      management_net:
+        ipv4_address: 10.10.40.91
+      dmz_net:
+        ipv4_address: 10.10.10.91
+      internal_net:
+        ipv4_address: 10.10.20.91
+      external_net:
+        ipv4_address: 10.10.0.91
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_PTRACE
+    environment:
+      - TZ=UTC
+    volumes:
+      - packet_capture_pcap:/pcap
+      - ./configs/tcpdump/tcpdump.sh:/usr/local/bin/start-capture.sh:ro
+    entrypoint: /bin/sh
+    command: /usr/local/bin/start-capture.sh
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "tcpdump-collector"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
+
+  # ---------------------------------------------------------------------------
+  # Wireshark Web UI - Packet analysis interface
+  # Analyze captured PCAP files with web-based Wireshark
+  # ---------------------------------------------------------------------------
+  wireshark-ui:
+    image: linuxserver/wireshark:latest
+    container_name: wireshark-ui
+    hostname: wireshark-ui
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.92
+      management_net:
+        ipv4_address: 10.10.40.92
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - TZ=UTC
+      - PUID=1000
+      - PGID=1000
+      - GUACD_LOG_LEVEL=info
+    volumes:
+      - packet_capture_pcap:/pcap:ro
+      - wireshark_config:/config
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "wireshark-ui"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "1.0"
+          memory: 1G
+    depends_on:
+      - tcpdump-collector
+      - traefik
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+    # NOTE: Routing configured via Traefik dynamic.yml (wireshark router)
+
+  # ---------------------------------------------------------------------------
+  # Netdata - Real-time System & Network Monitoring Web UI
+  # Provides beautiful real-time dashboards for all infrastructure metrics
+  # ---------------------------------------------------------------------------
+  netdata:
+    image: netdata/netdata:latest
+    container_name: netdata
+    hostname: netdata
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.93
+      management_net:
+        ipv4_address: 10.10.40.93
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+      - NET_ADMIN
+    environment:
+      - TZ=UTC
+      - PGID=0
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./configs/netdata:/etc/netdata
+      - netdata_cache:/var/cache/netdata
+      - netdata_lib:/var/lib/netdata
+    # ports:
+    #   - "19999:19999"
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "netdata"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    depends_on:
+      - traefik
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+    # NOTE: Routing configured via Traefik dynamic.yml (netdata router)
+
+  # ---------------------------------------------------------------------------
+  # Influx DB - Time Series Database for Extended Metrics Storage
+  # Backend storage for long-term metrics retention
+  # ---------------------------------------------------------------------------
+  influxdb:
+    image: influxdb:2-alpine
+    container_name: influxdb
+    hostname: influxdb
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.94
+    environment:
+      - TZ=UTC
+      - INFLUXDB_DB=cyberlab_metrics
+      - INFLUXDB_ADMIN_USER=admin
+      - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_PASSWORD:-InfluxPassword2025!}
+      - INFLUXDB_HTTP_AUTH_ENABLED=true
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://10.10.30.20:514"
+        tag: "influxdb"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    depends_on:
+      - traefik
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+    # NOTE: Routing configured via Traefik dynamic.yml (influxdb router)
 
   # ===========================================================================
 
@@ -1153,7 +1486,7 @@ services:
       - openldap_slapd:/backup/ldap-config:ro
       - mongodb_data:/backup/mongodb:ro
       - postgres_data:/backup/postgres:ro
-      - rocketchat_data:/backup/rocketchat:ro
+      - mattermost_data:/backup/mattermost:ro
       # Mount configuration directory
       - ./configs:/backup/configs:ro
       # Backup storage
@@ -1174,9 +1507,159 @@ services:
     depends_on:
       - wazuh.manager
       - openldap
-      - rocketchat
+      - mattermost
       - phpldapadmin
     restart: unless-stopped
+
+  # =========================================================================
+  # PROMETHEUS METRIC EXPORTERS
+  # =========================================================================
+
+  # PostgreSQL Exporter for Mattermost database
+  postgres-exporter-mm:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter-mm
+    hostname: postgres-exporter-mm
+    environment:
+      DATA_SOURCE_NAME: "postgresql://mmuser:Mattermost20250SecurePassword@postgres:5432/mattermost?sslmode=disable"
+    # ports:
+    #   - "9187:9187"
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.110
+      security_net:
+        ipv4_address: 10.10.30.110
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9187/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL Exporter for Multi-tenant database
+  # NOTE: Disabled due to authentication issues with multitenant database
+  # postgres-exporter-mt:
+  #   image: prometheuscommunity/postgres-exporter:latest
+  #   container_name: postgres-exporter-mt
+  #   environment:
+  #     DATA_SOURCE_NAME: "postgresql://postgres:lU5CoFz1O65ycZwIXU5tTU4GT0SKIyom@postgresql:5432/multitenant?sslmode=disable"
+  #   ports:
+  #     - "9188:9187"
+  #   networks:
+  #     - internal_net
+  #     - security_net
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--spider", "-q", "http://localhost:9187/metrics"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 3
+
+  # MongoDB Exporter
+  mongodb-exporter:
+    image: bitnami/mongodb-exporter:latest
+    container_name: mongodb-exporter
+    hostname: mongodb-exporter
+    environment:
+      MONGODB_URI: "mongodb://mongodb:27017"
+    # ports:
+    #   - "9216:9216"
+    networks:
+      internal_net:
+        ipv4_address: 10.10.20.112
+      security_net:
+        ipv4_address: 10.10.30.112
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9216/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Node Exporter - Host system metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    hostname: node-exporter
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    # ports:
+    #   - "9100:9100"
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.150
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9100/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # cAdvisor - Docker container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    hostname: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    # ports:
+    #   - "8081:8080"
+    networks:
+      security_net:
+        ipv4_address: 10.10.30.151
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # =========================================================================
+  # HONEYPOT EXPORTERS
+  # =========================================================================
+
+  # Custom Honeypot Prometheus Exporter
+  honeypot-exporter:
+    image: cyberlab/honeypot-exporter:latest
+    container_name: honeypot-exporter
+    hostname: honeypot-exporter
+    volumes:
+      - cowrie_logs:/var/log/cowrie:ro
+      - dionaea_logs:/opt/dionaea/var:ro
+      - suricata_logs:/var/log/suricata:ro
+      - pcap_data:/data/pcap:ro
+    # ports:
+    #   - "9191:9191"
+    networks:
+      dmz_net:
+        ipv4_address: 10.10.10.130
+      security_net:
+        ipv4_address: 10.10.30.130
+    restart: unless-stopped
+    depends_on:
+      - cowrie
+      - dionaea
+      - suricata
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:9191/metrics')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 # =============================================================================
 # VOLUMES
@@ -1215,8 +1698,6 @@ volumes:
   openldap_logs:
 
   # Communication Volumes
-  rocketchat_data:
-  rocketchat_logs:
   mattermost_data:
   mattermost_logs:
 
@@ -1229,6 +1710,7 @@ volumes:
   neuvector_enforcer_data:
 
   # OpenVPN Volume
+  mariadb_data:
   openvpn_data:
 
   # DNS Server Volume
@@ -1246,6 +1728,20 @@ volumes:
   # Monitoring Volumes
   prometheus_data:
   grafana_storage:
+
+  # Packet Capture Volumes
+  packet_capture_data:
+  packet_capture_logs:
+  packet_capture_pcap:
+  pcap_data:
+  wireshark_config:
+
+  # Network Monitoring Volumes
+  netdata_config:
+  netdata_cache:
+  netdata_lib:
+  influxdb_data:
+  influxdb_config:
 
   # Backup Storage
   backup_storage:

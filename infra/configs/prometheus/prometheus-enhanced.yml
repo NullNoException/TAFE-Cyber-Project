@@ -217,6 +217,34 @@ scrape_configs:
     scrape_interval: 30s
 
   # =========================================================================
+  # HONEYPOT SERVICES (with custom exporters)
+  # =========================================================================
+
+  - job_name: 'cowrie-honeypot'
+    honor_timestamps: true
+    metrics_path: '/metrics'
+    scheme: http
+    static_configs:
+      - targets: ['cowrie-exporter:9191']
+        labels:
+          service: 'cowrie'
+          type: 'ssh-telnet-honeypot'
+          layer: 'security'
+    scrape_interval: 30s
+
+  - job_name: 'dionaea-honeypot'
+    honor_timestamps: true
+    metrics_path: '/metrics'
+    scheme: http
+    static_configs:
+      - targets: ['dionaea-exporter:9192']
+        labels:
+          service: 'dionaea'
+          type: 'multi-protocol-honeypot'
+          layer: 'security'
+    scrape_interval: 30s
+
+  # =========================================================================
   # APPLICATION SERVICES
   # =========================================================================
 
@@ -259,25 +287,10 @@ scrape_configs:
           layer: 'infrastructure'
     scrape_interval: 15s
 
-  # Custom Honeypot Exporters
-  - job_name: 'honeypot-exporter'
-    honor_timestamps: true
-    metrics_path: '/metrics'
-    scheme: http
-    static_configs:
-      - targets: ['honeypot-exporter:9191']
-        labels:
-          service: 'honeypot-exporter'
-          layer: 'security'
-          type: 'custom-exporter'
-    scrape_interval: 30s
-
   # Netdata - Real-time metrics (optional, already has web UI)
   - job_name: 'netdata'
     honor_timestamps: true
-    metrics_path: '/api/v1/allmetrics'
-    params:
-      format: ['prometheus']
+    metrics_path: '/api/v1/data'
     scheme: http
     static_configs:
       - targets: ['netdata:19999']
@@ -285,6 +298,34 @@ scrape_configs:
           service: 'netdata'
           layer: 'observability'
     scrape_interval: 10s
+
+  # =========================================================================
+  # PACKET CAPTURE & NETWORK ANALYSIS
+  # =========================================================================
+
+  - job_name: 'suricata'
+    honor_timestamps: true
+    metrics_path: '/metrics'
+    scheme: http
+    static_configs:
+      - targets: ['suricata-exporter:9193']
+        labels:
+          service: 'suricata'
+          type: 'ids-ips'
+          layer: 'security'
+    scrape_interval: 30s
+
+  - job_name: 'tcpdump-collector'
+    honor_timestamps: true
+    metrics_path: '/metrics'
+    scheme: http
+    static_configs:
+      - targets: ['tcpdump-exporter:9194']
+        labels:
+          service: 'tcpdump'
+          type: 'packet-capture'
+          layer: 'network'
+    scrape_interval: 30s
 
   # =========================================================================
   # REMOTE STORAGE CONFIGURATION (Long-term storage to InfluxDB)
