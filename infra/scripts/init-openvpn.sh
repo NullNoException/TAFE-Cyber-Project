@@ -84,6 +84,28 @@ echo "Applying RADIUS auth configuration and restarting OpenVPN-AS..."
 docker exec "$CONTAINER_NAME" "$OAS_SCRIPTS_DIR/sacli" start || true
 
 echo
+echo "Configuring Daloradius database connection..."
+
+# Wait for Daloradius container to be ready
+DALORADIUS_CONTAINER="daloradius"
+if docker ps --format '{{.Names}}' | grep -q "^${DALORADIUS_CONTAINER}$"; then
+  echo "Waiting for Daloradius to be ready..."
+  sleep 5
+  
+  # Fix Daloradius database configuration
+  DALORADIUS_CONFIG="/var/www/daloradius/library/daloradius.conf.php"
+  
+  echo "Updating Daloradius database configuration..."
+  docker exec "$DALORADIUS_CONTAINER" sed -i "s/\$configValues\['CONFIG_DB_HOST'\] = '';/\$configValues['CONFIG_DB_HOST'] = 'mariadb';/" "$DALORADIUS_CONFIG" || true
+  docker exec "$DALORADIUS_CONTAINER" sed -i "s/\$configValues\['CONFIG_DB_PASS'\] = 'radpass';/\$configValues['CONFIG_DB_PASS'] = 'radiuspassword123';/" "$DALORADIUS_CONFIG" || true
+  
+  echo "✓ Daloradius database connection configured"
+else
+  echo "⚠ Daloradius container not running, skipping database configuration"
+  echo "  You can run './infra/scripts/fix-daloradius-db.sh' later if needed"
+fi
+
+echo
 echo "Configuring VPN routing through workstation..."
 
 # Configure VPN to push routes to internal networks via workstation gateway

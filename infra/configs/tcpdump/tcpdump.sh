@@ -37,7 +37,8 @@ echo "[$(date)] PCAP files will be stored in: $PCAP_DIR"
 echo "[$(date)] File size limit: ${PCAP_FILE_SIZE}M per file"
 echo "[$(date)] Keeping last $PCAP_KEEP_COUNT files"
 
-# Capture all interfaces with automatic file rotation
+# Capture all interfaces with port 3000 filter to see attack traffic
+# Uses BPF (Berkeley Packet Filter) to isolate attack packets
 tcpdump \
     -i any \
     -w "$PCAP_DIR/capture-%Y%m%d-%H%M%S.pcap" \
@@ -45,7 +46,7 @@ tcpdump \
     -C $PCAP_FILE_SIZE \
     -Z root \
     -s $SNAPLEN \
-    "$CAPTURE_FILTER" 2>&1 | while IFS= read -r line; do
+    "tcp port 3000 or (tcp port 3000 and tcp[tcpflags] & tcp-syn != 0)" 2>&1 | while IFS= read -r line; do
         echo "[$(date)] [tcpdump] $line"
     done &
 

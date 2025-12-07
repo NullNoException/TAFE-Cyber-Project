@@ -834,7 +834,7 @@ services:
       # Suricata integration - rules mounted to container
       # Decoders disabled due to format incompatibility - using native Wazuh JSON parsing
       - ./configs/wazuh/suricata_rules.xml:/var/ossec/etc/rules/suricata_rules.xml:ro
-      - ./configs/wazuh/custom_detection_rules.xml:/var/ossec/etc/rules/custom_detection_rules.xml:ro
+      # - ./configs/wazuh/custom_detection_rules.xml:/var/ossec/etc/rules/custom_detection_rules.xml:ro
       # Share Suricata logs volume for log monitoring
       - suricata_logs:/var/log/suricata:ro
     logging:
@@ -869,11 +869,9 @@ services:
       - "wazuh.manager:10.10.30.20"
     # NOTE: Access controlled via Traefik dynamic.yml (security-net-access middleware)
     environment:
-      - INDEXER_USERNAME=admin
-      - INDEXER_PASSWORD=SecretPassword
-      - WAZUH_API_URL=https://wazuh.manager
       - DASHBOARD_USERNAME=admin
-      - DASHBOARD_PASSWORD=admin
+      - DASHBOARD_PASSWORD=SecretPassword
+      - WAZUH_API_URL=https://wazuh.manager
       - API_USERNAME=wazuh-wui
       - API_PASSWORD=MyS3cr37P450r.*-
       - TZ=UTC
@@ -1338,6 +1336,8 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    ports:
+      - "3001:3000"
     environment:
       - TZ=UTC
       - PUID=1000
